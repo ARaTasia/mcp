@@ -2,7 +2,7 @@ node_modules/
 dist/
 data/
 .env
-.mcp.json
+/.mcp.json
 .claude/
 plugins/*/node_modules/
 plugins/*/dist/
