@@ -17,4 +17,4 @@ const config = {
   }
 };
 
-writeFileSync(join(pluginRoot, '.mcp.json'), JSON.stringify(config, null, 2));
+writeFileSync(join(process.cwd(), '.mcp.json'), JSON.stringify(config, null, 2));

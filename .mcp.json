@@ -1,6 +1,0 @@
-{
-  "kanban": {
-    "command": "npx",
-    "args": ["-y", "mcp-my-kanban"]
-  }
-}
