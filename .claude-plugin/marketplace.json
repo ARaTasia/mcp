@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ARaTasia-mcp",
+  "version": "1.0.0",
+  "description": "ARaTasia's MCP plugins for Claude Code",
+  "owner": { "name": "ARaTasia" },
+  "plugins": [
+    {
+      "name": "mcp-my-kanban",
+      "description": "Kanban board MCP server for agent team coordination.",
+      "source": ".",
+      "category": "productivity"
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kanban MCP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="header">
+  <div class="header-brand">
+    <h1>Kanban<span>MCP</span></h1>
+    <div class="ws-status">
+      <div class="ws-dot" id="wsDot"></div>
+      <span id="wsLabel">Connecting...</span>
+    </div>
+  </div>
+
+  <div class="header-controls">
+    <div class="header-field">
+      <span class="header-label">프로젝트</span>
+      <select id="projectSelect">
+        <option value="">전체</option>
+      </select>
+    </div>
+
+    <div class="header-field">
+      <span class="header-label">태그</span>
+      <div class="tag-filters" id="tagFilters">
+        <!-- rendered by JS -->
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="newTaskBtn">+ 새 작업</button>
+  </div>
+</header>
+
+<div class="board-wrap">
+  <div class="board" id="board">
+    <!-- columns rendered by JS -->
+  </div>
+</div>
+
+<!-- Task Detail Modal -->
+<div class="modal-overlay" id="taskModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">—</div>
+      <button class="modal-close" id="modalClose">×</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- Create Task Modal -->
+<div class="modal-overlay" id="createTaskModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">새 작업 만들기</div>
+      <button class="modal-close" id="createTaskClose">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" id="modalProjectGroup">
+        <label>프로젝트 *</label>
+        <select id="newTaskProject"></select>
+      </div>
+      <div class="form-group">
+        <label>제목 *</label>
+        <input type="text" id="newTaskTitle" placeholder="작업 제목" />
+      </div>
+      <div class="form-group">
+        <label>설명</label>
+        <textarea id="newTaskDesc" rows="3" placeholder="작업 설명 (선택)"></textarea>
+      </div>
+      <div class="form-group">
+        <label>담당자</label>
+        <input type="text" id="newTaskAssignee" placeholder="에이전트 이름 (선택)" />
+      </div>
+      <div class="form-group">
+        <label>태그 (쉼표 구분)</label>
+        <input type="text" id="newTaskTags" placeholder="backend, frontend, db" />
+      </div>
+      <div class="form-group">
+        <label>전제조건 Task ID (쉼표 구분)</label>
+        <input type="text" id="newTaskPrereqs" placeholder="task_id1, task_id2" />
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button class="btn btn-ghost" id="createTaskCancel">취소</button>
+        <button class="btn btn-primary" id="createTaskSubmit">만들기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
