@@ -8,7 +8,7 @@
     {
       "name": "mcp-my-kanban",
       "description": "Kanban board MCP server for agent team coordination.",
-      "source": ".",
+      "source": "./",
       "category": "productivity"
     }
   ]
