@@ -3,3 +3,6 @@ dist/
 data/
 .env
 .claude/
+plugins/*/node_modules/
+plugins/*/dist/
+plugins/*/data/

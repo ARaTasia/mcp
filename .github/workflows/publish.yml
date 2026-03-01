@@ -6,6 +6,9 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/mcp-my-kanban
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
