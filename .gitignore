@@ -6,3 +6,4 @@ data/
 plugins/*/node_modules/
 plugins/*/dist/
 plugins/*/data/
+.playwright-mcp/
