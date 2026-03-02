@@ -8,7 +8,34 @@ description: >
 
 # Kanban Agent Workflow
 
-## 세션 시작 (Session Init)
+## ⚠️ 필수 전제조건 — 프로젝트 등록
+
+**모든 `task_*` 도구는 프로젝트가 등록된 후에만 작동한다.**
+MCP 시작 시 자동 등록되지 않는다. 반드시 수동으로 등록해야 한다.
+
+등록 없이 태스크 도구를 호출하면 다음 오류를 반환한다:
+```
+No project registered. Use project_create or project_get_by_path to register a project first.
+```
+
+### 전체 사용 순서
+
+```
+① 프로젝트 등록  →  ② PROJECT_ID 확보  →  ③ task_* 도구 사용
+```
+
+### 등록 방법
+
+| 상황 | 도구 | 설명 |
+|------|------|------|
+| 이 워크스페이스 처음 사용 | `project_create` | 새 프로젝트 생성 · `.kanban` 파일 기록 |
+| 이전에 사용한 워크스페이스 | `project_get_by_path` | `.kanban` 파일로 기존 프로젝트 복원 |
+
+→ 세부 절차는 아래 **세션 시작** 섹션 참고.
+
+---
+
+## 세션 시작 (Session Init) — 프로젝트 등록 필수
 
 **모든 세션 시작 시 반드시 아래 순서를 따른다.**
 

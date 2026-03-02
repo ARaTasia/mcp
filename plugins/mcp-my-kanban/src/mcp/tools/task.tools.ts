@@ -2,6 +2,15 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { kanbanService } from '../../services/kanban.service.js';
 
+async function requireProject() {
+  const projects = await kanbanService.listProjects();
+  if (projects.length === 0) {
+    throw new Error(
+      'No project registered. Use project_create or project_get_by_path to register a project first.',
+    );
+  }
+}
+
 function ok(data: unknown): { content: [{ type: 'text'; text: string }] } {
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
 }
@@ -21,6 +30,7 @@ export function registerTaskTools(server: McpServer): void {
     },
     async ({ projectId, status, tags }) => {
       try {
+        await requireProject();
         return ok(await kanbanService.listTasks({ projectId, status, tags }));
       } catch (e) {
         return err((e as Error).message);
@@ -34,6 +44,7 @@ export function registerTaskTools(server: McpServer): void {
     { taskId: z.string().describe('Task ID') },
     async ({ taskId }) => {
       try {
+        await requireProject();
         return ok(await kanbanService.getTask(taskId));
       } catch (e) {
         return err((e as Error).message);
@@ -57,6 +68,7 @@ export function registerTaskTools(server: McpServer): void {
     },
     async ({ projectId, title, description, tags, assignee, prerequisites }) => {
       try {
+        await requireProject();
         return ok(
           await kanbanService.createTask({ projectId, title, description, tags, assignee, prerequisites }),
         );
@@ -75,6 +87,7 @@ export function registerTaskTools(server: McpServer): void {
     },
     async ({ taskId, agentName }) => {
       try {
+        await requireProject();
         return ok(await kanbanService.claimTask(taskId, agentName));
       } catch (e) {
         return err((e as Error).message);
@@ -91,6 +104,7 @@ export function registerTaskTools(server: McpServer): void {
     },
     async ({ taskId, agentName }) => {
       try {
+        await requireProject();
         return ok(await kanbanService.startTask(taskId, agentName));
       } catch (e) {
         return err((e as Error).message);
@@ -108,6 +122,7 @@ export function registerTaskTools(server: McpServer): void {
     },
     async ({ taskId, agentName, summary }) => {
       try {
+        await requireProject();
         return ok(await kanbanService.submitReview(taskId, agentName, summary));
       } catch (e) {
         return err((e as Error).message);
@@ -125,6 +140,7 @@ export function registerTaskTools(server: McpServer): void {
     },
     async ({ taskId, agentName, comment }) => {
       try {
+        await requireProject();
         return ok(await kanbanService.addComment(taskId, agentName, comment));
       } catch (e) {
         return err((e as Error).message);
@@ -146,6 +162,7 @@ export function registerTaskTools(server: McpServer): void {
     },
     async ({ taskId, agentName, type, summary, diff }) => {
       try {
+        await requireProject();
         return ok(await kanbanService.logChange(taskId, agentName, type, summary, diff));
       } catch (e) {
         return err((e as Error).message);
@@ -165,6 +182,7 @@ export function registerTaskTools(server: McpServer): void {
     },
     async ({ taskId, title, description, tags, prerequisites }) => {
       try {
+        await requireProject();
         return ok(await kanbanService.updateTaskMeta(taskId, { title, description, tags, prerequisites }));
       } catch (e) {
         return err((e as Error).message);

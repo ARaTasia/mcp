@@ -9,7 +9,6 @@ import { initSchema } from './db/schema.js';
 import { createMcpServer } from './mcp/server.js';
 import webRouter from './web/router.js';
 import { initWebSocket } from './web/websocket.js';
-import { kanbanService } from './services/kanban.service.js';
 
 const WEB_PORT = parseInt(process.env.WEB_PORT ?? '3000', 10);
 
@@ -61,15 +60,6 @@ async function tryStartWebServer() {
 async function main() {
   await initSchema();
   await tryStartWebServer();
-
-  // Auto-create project from workspace name
-  const workspacePath = process.env.KANBAN_WORKSPACE || process.cwd();
-  const workspaceName = path.basename(workspacePath);
-  const projects = await kanbanService.listProjects();
-  if (!projects.some(p => p.name === workspaceName)) {
-    await kanbanService.createProject(workspaceName);
-    process.stderr.write(`Created project: ${workspaceName}\n`);
-  }
 
   // PID tracking for shutdown when all clients disconnect
   registerPid();
