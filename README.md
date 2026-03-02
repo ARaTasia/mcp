@@ -1,65 +1,54 @@
-# Kanban MCP Plugin
+# mcp-my-kanban
 
-칸반보드 MCP 서버 + Claude Code 플러그인.
+[한국어](plugins/mcp-my-kanban/README.ko.md)
 
-에이전트 팀이 태스크를 생성·이동·코멘트하고, 웹 UI에서 사용자가 실시간으로 현황 확인 및 리뷰 승인/반려 처리.
+Kanban board MCP server + Claude Code plugin for agent team coordination.
 
-## 사용법
+Agents create, move, and comment on tasks. Users review and approve via a real-time web UI.
 
-### 1. MCP 서버 시작
-
-```bash
-cd D:/@Workspace/media/tech/mcp
-npm run dev
-```
-
-- Web UI + WebSocket: http://localhost:3000
-- MCP endpoint: http://localhost:3001/mcp
-
-### 2. Claude Code에서 플러그인 로드
-
-```bash
-claude --plugin-dir D:/@Workspace/media/tech/mcp/kanban
-```
-
-`--plugin-dir`로 로드하면:
-- `.claude-plugin/plugin.json` 의 스킬이 자동 등록됨
-- `.mcp.json` 의 MCP 서버가 자동 연결됨
-
-### 3. 스킬 호출
+## Installation
 
 ```
-/kanban-mcp:kanban
+/install-plugin ARaTasia/mcp
 ```
 
-`/help` 에서 `kanban-mcp:kanban` 스킬이 목록에 표시되는지 확인.
+## Tools
 
-## 구조
+### Project
 
-```
-kanban/
-├── .claude-plugin/
-│   └── plugin.json          # 플러그인 메타데이터 (name: "kanban-mcp")
-├── .mcp.json                 # MCP 서버 연결 설정
-├── skills/
-│   └── kanban/
-│       └── SKILL.md          # 에이전트 워크플로우 가이드
-└── src/                      # MCP 서버 소스
-```
+| Tool | Description |
+|------|-------------|
+| `project_create` | Create a new project. Writes `.kanban` file to prevent duplicates. |
+| `project_get_by_path` | Restore project from `.kanban` file in workspace directory. |
+| `project_list` | List all projects. |
+| `project_delete` | Delete a project (use `force` to include tasks). |
 
-## 스킬 내용
+### Task
 
-`skills/kanban/SKILL.md` — 에이전트가 칸반보드를 사용할 때의 워크플로우:
+| Tool | Description |
+|------|-------------|
+| `task_create` | Create a new task in `todo` status with optional tags, assignee, prerequisites. |
+| `task_list` | List tasks. Filter by `projectId`, `status`, `tags`. |
+| `task_get` | Get a task with its full history. |
+| `task_claim` | Claim a task (`todo` → `claimed`). Validates prerequisites. |
+| `task_start` | Start work (`claimed` → `in_progress`). |
+| `task_submit_review` | Submit for review (`in_progress` → `review`). |
+| `task_comment` | Add a comment (no status change). |
+| `task_log_change` | Record code changes with diff (`feature` / `fix` / `docs` / `refactor`). |
+| `task_update` | Update task metadata (title, description, tags, prerequisites). |
 
-- 태스크 선택 전 전제조건 확인
-- `task_claim` → `task_start` → `task_submit_review` 흐름
-- 반려(reject) 후 재작업 흐름
-- 사용 가능한 MCP 도구 목록
-
-## 상태 흐름
+## Task Status Flow
 
 ```
 todo → claimed → in_progress → review → done
-                                   ↓ (reject)
-                                claimed  (재작업 필요)
+                                  ↓
+                               claimed  (rejected)
 ```
+
+## Web UI
+
+A real-time dashboard starts automatically with the server. Default port `34567` (configurable via `WEB_PORT`).
+
+---
+
+See [full documentation](plugins/mcp-my-kanban/README.md) for detailed parameter references.
