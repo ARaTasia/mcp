@@ -1,6 +1,6 @@
 {
   "name": "mcp-my-kanban",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Kanban board MCP server for agent team coordination",
   "main": "dist/mcp-stdio.js",
   "bin": {
@@ -20,7 +20,7 @@
   "scripts": {
     "dev": "tsx watch src/mcp-stdio.ts",
     "build": "tsc && copyfiles -u 1 \"src/web/public/**/*\" dist/",
-    "prepare": "npm run build",
+    "prepublishOnly": "npm run build",
     "start": "node dist/mcp-stdio.js",
     "test": "vitest run",
     "test:watch": "vitest",
