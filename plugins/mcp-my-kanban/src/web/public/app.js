@@ -86,19 +86,56 @@ async function loadTasks() {
   renderTagFilters();
 }
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function formatProjectName(project) {
+  if (project.workspace_path) {
+    const normalized = project.workspace_path.replace(/\\/g, '/');
+    const segments = normalized.split('/').filter(Boolean);
+    if (segments.length <= 3) return normalized;
+    return '.../' + segments.slice(-3).join('/');
+  }
+  return project.name;
+}
+
 // ── Render ─────────────────────────────────────────────────────────────────
 
 function renderProjectSelect() {
-  const sel = document.getElementById('projectSelect');
-  const current = sel.value;
-  sel.innerHTML = '<option value="">전체</option>';
+  const dropdown = document.getElementById('projectDropdown');
+  const trigger = document.getElementById('projectTrigger');
+  const optionsEl = document.getElementById('projectOptions');
+  const delBtn = document.getElementById('deleteProjectBtn');
+
+  // Update trigger text
+  const selected = state.projects.find(p => p.id === state.selectedProject);
+  trigger.querySelector('.project-trigger-text').textContent =
+    selected ? formatProjectName(selected) : '전체';
+  trigger.title = selected?.workspace_path || selected?.name || '전체';
+
+  // Build options list
+  optionsEl.innerHTML = '';
+
+  // "전체" option
+  const allOpt = document.createElement('div');
+  allOpt.className = 'project-option' + (!state.selectedProject ? ' selected' : '');
+  allOpt.innerHTML = '<span class="project-option-name">전체</span>';
+  allOpt.addEventListener('click', () => selectProject(''));
+  optionsEl.appendChild(allOpt);
+
   state.projects.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.name;
-    sel.appendChild(opt);
+    const opt = document.createElement('div');
+    opt.className = 'project-option' + (p.id === state.selectedProject ? ' selected' : '');
+    opt.title = p.workspace_path || p.name;
+    opt.innerHTML = `
+      <span class="project-option-name">${escHtml(formatProjectName(p))}</span>
+      <span class="project-option-time">${timeAgo(p.last_activity)}</span>
+    `;
+    opt.addEventListener('click', () => selectProject(p.id));
+    optionsEl.appendChild(opt);
   });
-  if (current) sel.value = current;
+
+  // Show/hide delete button
+  delBtn.style.display = state.selectedProject ? '' : 'none';
 }
 
 function renderTagFilters() {
@@ -409,7 +446,7 @@ document.getElementById('newTaskBtn').addEventListener('click', () => {
   state.projects.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p.id;
-    opt.textContent = p.name;
+    opt.textContent = formatProjectName(p);
     if (p.id === state.selectedProject) opt.selected = true;
     sel.appendChild(opt);
   });
@@ -461,11 +498,64 @@ document.getElementById('createTaskSubmit').addEventListener('click', async () =
   }
 });
 
-// Project select
-document.getElementById('projectSelect').addEventListener('change', async (e) => {
-  state.selectedProject = e.target.value;
+// ── Project dropdown ──────────────────────────────────────────────────────
+
+async function selectProject(id) {
+  state.selectedProject = id;
   state.activeTag = '';
+  document.getElementById('projectDropdown').classList.remove('open');
+  renderProjectSelect();
   await loadTasks();
+}
+
+document.getElementById('projectTrigger').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('projectDropdown').classList.toggle('open');
+});
+
+document.addEventListener('click', (e) => {
+  const dropdown = document.getElementById('projectDropdown');
+  if (!dropdown.contains(e.target)) {
+    dropdown.classList.remove('open');
+  }
+});
+
+// ── Delete project ────────────────────────────────────────────────────────
+
+document.getElementById('deleteProjectBtn').addEventListener('click', () => {
+  const projectId = state.selectedProject;
+  if (!projectId) return;
+
+  const project = state.projects.find(p => p.id === projectId);
+  if (!project) return;
+
+  document.getElementById('deleteProjectMsg').textContent =
+    `"${formatProjectName(project)}" 프로젝트를 삭제하시겠습니까?`;
+
+  const hasTasks = state.tasks.length > 0;
+  document.getElementById('deleteProjectTaskWarning').style.display = hasTasks ? '' : 'none';
+
+  document.getElementById('deleteProjectModal').classList.add('open');
+});
+
+document.getElementById('deleteProjectClose').addEventListener('click', () => closeModal('deleteProjectModal'));
+document.getElementById('deleteProjectCancel').addEventListener('click', () => closeModal('deleteProjectModal'));
+document.getElementById('deleteProjectModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal('deleteProjectModal');
+});
+
+document.getElementById('deleteProjectConfirm').addEventListener('click', async () => {
+  const projectId = state.selectedProject;
+  if (!projectId) return;
+
+  try {
+    await api('DELETE', `/api/projects/${projectId}?force=true`);
+    closeModal('deleteProjectModal');
+    state.selectedProject = '';
+    await Promise.all([loadProjects(), loadTasks()]);
+  } catch (e) {
+    alert('삭제 실패: ' + e.message);
+  }
 });
 
 // Tag filter select is wired up inside renderTagFilters()
@@ -526,6 +616,15 @@ function connectWS() {
       if (state.openTaskId === payload.taskId) {
         openTaskDetail(payload.taskId);
       }
+    } else if (type === 'project_deleted') {
+      state.projects = state.projects.filter(p => p.id !== payload.projectId);
+      if (state.selectedProject === payload.projectId) {
+        state.selectedProject = '';
+        state.tasks = [];
+        renderBoard();
+        renderTagFilters();
+      }
+      renderProjectSelect();
     }
   };
 }
@@ -541,6 +640,5 @@ function updateWsStatus(connected) {
 
 (async function init() {
   connectWS();
-  await loadProjects();
-  await loadTasks();
+  await Promise.all([loadProjects(), loadTasks()]);
 })();

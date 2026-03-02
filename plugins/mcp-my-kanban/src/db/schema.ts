@@ -44,4 +44,9 @@ export async function initSchema(): Promise<void> {
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     );
   `);
+
+  // Migration: add workspace_path column to projects
+  try {
+    await db.execute({ sql: 'ALTER TABLE projects ADD COLUMN workspace_path TEXT', args: [] });
+  } catch { /* column already exists */ }
 }

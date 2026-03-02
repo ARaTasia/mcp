@@ -44,7 +44,9 @@ export interface Project {
   id: string;
   name: string;
   description: string | null;
+  workspace_path: string | null;
   created_at: number;
+  last_activity?: number;
 }
 
 export interface ChangeLog {
@@ -113,7 +115,15 @@ function hasCycle(taskId: string, prereqs: string[], allPrereqs: Map<string, str
 
 export class KanbanService {
   async listProjects(): Promise<Project[]> {
-    const rows = await queryAll('SELECT * FROM projects ORDER BY created_at DESC');
+    const rows = await queryAll(`
+      SELECT p.*,
+        COALESCE(
+          (SELECT MAX(t.updated_at) FROM tasks t WHERE t.project_id = p.id),
+          p.created_at
+        ) AS last_activity
+      FROM projects p
+      ORDER BY last_activity DESC
+    `);
     return rows as unknown as Project[];
   }
 
@@ -138,8 +148,8 @@ export class KanbanService {
     // 3. 신규 생성
     const id = nanoid();
     await db.execute({
-      sql: 'INSERT INTO projects (id, name, description) VALUES (?, ?, ?)',
-      args: [id, name, description ?? null],
+      sql: 'INSERT INTO projects (id, name, description, workspace_path) VALUES (?, ?, ?, ?)',
+      args: [id, name, description ?? null, workspacePath ?? null],
     });
 
     // 4. .kanban 파일 기록
@@ -164,24 +174,41 @@ export class KanbanService {
   }
 
   async deleteProject(projectId: string, force = false): Promise<{ deleted: true }> {
-    const project = await queryOne('SELECT id FROM projects WHERE id = ?', [projectId]);
+    const project = await queryOne('SELECT id, workspace_path FROM projects WHERE id = ?', [projectId]);
     if (!project) throw new Error(`Project not found: ${projectId}`);
 
-    const tasks = await queryAll('SELECT id FROM tasks WHERE project_id = ?', [projectId]);
-    if (tasks.length > 0 && !force) {
+    const taskCount = await queryOne(
+      'SELECT COUNT(*) as cnt FROM tasks WHERE project_id = ?', [projectId],
+    );
+    const count = (taskCount?.cnt as number) ?? 0;
+
+    if (count > 0 && !force) {
       throw new Error(
-        `Project has ${tasks.length} task(s). Use force=true to delete the project and all its tasks.`,
+        `Project has ${count} task(s). Use force=true to delete the project and all its tasks.`,
       );
     }
 
-    if (force && tasks.length > 0) {
-      for (const t of tasks) {
-        await db.execute({ sql: 'DELETE FROM task_history WHERE task_id = ?', args: [t.id as string] });
-      }
+    if (force && count > 0) {
+      await db.execute({
+        sql: 'DELETE FROM task_changes WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?)',
+        args: [projectId],
+      });
+      await db.execute({
+        sql: 'DELETE FROM task_history WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?)',
+        args: [projectId],
+      });
       await db.execute({ sql: 'DELETE FROM tasks WHERE project_id = ?', args: [projectId] });
     }
 
     await db.execute({ sql: 'DELETE FROM projects WHERE id = ?', args: [projectId] });
+
+    // Clean up .kanban file if workspace_path exists
+    if (project.workspace_path) {
+      const kanbanFile = path.join(project.workspace_path as string, '.kanban');
+      await fs.unlink(kanbanFile).catch(() => {});
+    }
+
+    broadcast('project_deleted', { projectId });
     return { deleted: true };
   }
 

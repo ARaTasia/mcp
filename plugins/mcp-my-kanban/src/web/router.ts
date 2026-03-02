@@ -28,6 +28,16 @@ router.post('/api/projects', async (req, res) => {
   }
 });
 
+router.delete('/api/projects/:id', async (req, res) => {
+  try {
+    const force = req.query.force === 'true';
+    res.json(await kanbanService.deleteProject(req.params.id, force));
+  } catch (e) {
+    const status = (e as Error).message.includes('not found') ? 404 : 400;
+    res.status(status).json({ error: (e as Error).message });
+  }
+});
+
 // Tasks
 router.get('/api/tasks', async (req, res) => {
   try {
