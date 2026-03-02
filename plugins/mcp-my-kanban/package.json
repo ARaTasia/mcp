@@ -15,7 +15,8 @@
     "!dist/__tests__/",
     "skills/",
     ".claude-plugin/",
-    "README.md"
+    "README.md",
+    "README.ko.md"
   ],
   "scripts": {
     "dev": "tsx watch src/mcp-stdio.ts",
