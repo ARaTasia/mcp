@@ -5,7 +5,7 @@ import { initWebSocket } from './web/websocket.js';
 import webRouter from './web/router.js';
 import { createMcpApp } from './mcp/server.js';
 
-const WEB_PORT = parseInt(process.env.WEB_PORT ?? '3000', 10);
+const WEB_PORT = parseInt(process.env.WEB_PORT ?? '34567', 10);
 const MCP_PORT = parseInt(process.env.MCP_PORT ?? '3001', 10);
 
 async function main() {

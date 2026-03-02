@@ -2,7 +2,7 @@
   "mcpServers": {
     "kanban": {
       "command": "npx",
-      "args": ["-y", "mcp-my-kanban"]
+      "args": ["-y", "mcp-my-kanban@latest"]
     }
   }
 }

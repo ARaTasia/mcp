@@ -10,7 +10,7 @@ import { createMcpServer } from './mcp/server.js';
 import webRouter from './web/router.js';
 import { initWebSocket } from './web/websocket.js';
 
-const WEB_PORT = parseInt(process.env.WEB_PORT ?? '3000', 10);
+const WEB_PORT = parseInt(process.env.WEB_PORT ?? '34567', 10);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, '../data');
