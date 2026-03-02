@@ -7,4 +7,5 @@ data/
 plugins/*/node_modules/
 plugins/*/dist/
 plugins/*/data/
+plugins/*/CLAUDE.md
 .playwright-mcp/
