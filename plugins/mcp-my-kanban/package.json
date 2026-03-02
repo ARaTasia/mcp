@@ -1,6 +1,6 @@
 {
   "name": "mcp-my-kanban",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Kanban board MCP server for agent team coordination",
   "main": "dist/mcp-stdio.js",
   "bin": {
