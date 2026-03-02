@@ -1,7 +1,7 @@
 {
   "name": "mcp-my-kanban",
   "description": "Kanban board MCP server for agent team coordination. Provides task management tools and agent workflow guidance.",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "author": {
     "name": "ARaTasia"
   }

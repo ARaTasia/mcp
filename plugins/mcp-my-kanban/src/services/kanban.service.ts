@@ -3,9 +3,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import { db } from '../db/index.js';
 import { broadcast } from '../web/websocket.js';
-import type { InValue, Row, ResultSet } from '@libsql/client';
+import type { InValue, Row, ResultSet } from '../db/index.js';
 
-// @libsql/client Row extends Array, so Object.keys gives positional indices.
+// Row is an array (indexed by column position).
 // Use ResultSet.columns to build a plain named object.
 function rowToObj(rs: ResultSet, row: Row): Record<string, InValue> {
   const obj: Record<string, InValue> = {};

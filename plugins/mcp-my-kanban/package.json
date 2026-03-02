@@ -1,15 +1,23 @@
 {
   "name": "mcp-my-kanban",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Kanban board MCP server for agent team coordination",
   "main": "dist/mcp-stdio.js",
   "bin": {
-    "mcp-my-kanban": "./dist/mcp-stdio.js"
+    "mcp-my-kanban": "dist/mcp-stdio.js"
   },
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "!dist/__tests__/",
+    "README.md"
+  ],
   "scripts": {
     "dev": "tsx watch src/mcp-stdio.ts",
-    "build": "tsc",
+    "build": "tsc && copyfiles -u 1 \"src/web/public/**/*\" dist/",
     "prepare": "npm run build",
     "start": "node dist/mcp-stdio.js",
     "test": "vitest run",
@@ -18,21 +26,23 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ARaTasia/mcp.git"
+    "url": "git+https://github.com/ARaTasia/mcp.git"
   },
   "dependencies": {
-    "@libsql/client": "^0.17.0",
     "@modelcontextprotocol/sdk": "^1.27.0",
+    "better-sqlite3": "^12.6.2",
     "express": "^4.19.2",
     "nanoid": "^5.0.7",
     "ws": "^8.18.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^4.17.21",
     "@types/node": "^20.14.0",
     "@types/ws": "^8.5.12",
     "@vitest/coverage-v8": "^2.1.9",
+    "copyfiles": "^2.4.1",
     "tsx": "^4.16.0",
     "typescript": "^5.5.0",
     "vitest": "^2.1.9"
