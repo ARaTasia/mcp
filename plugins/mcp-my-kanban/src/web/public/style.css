@@ -778,6 +778,23 @@ select:focus { border-color: var(--accent); }
 }
 .card-approve-btn:hover { background: rgba(167,139,250,0.25); }
 
+/* ── Approve button in modal ───────────────────────────────────────────── */
+
+.modal-approve-btn {
+  padding: 6px 16px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(167,139,250,0.3);
+  background: rgba(167,139,250,0.12);
+  color: var(--col-approved);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.12s;
+  align-self: center;
+}
+.modal-approve-btn:hover { background: rgba(167,139,250,0.25); }
+
 /* ── Archive section ────────────────────────────────────────────────────── */
 
 .archive-section {

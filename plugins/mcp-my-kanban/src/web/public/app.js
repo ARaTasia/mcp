@@ -519,6 +519,9 @@ function renderTaskModal(task, history, changes = [], isArchived = false) {
         <div class="modal-label">${t('modal.status')}</div>
         <span class="status-badge status-${task.status || 'done'}">${statusLabel}</span>
       </div>
+      ${task.status === 'todo' && !isArchived ? `<div style="display:flex;align-items:end">
+        <button class="modal-approve-btn" id="modalApproveBtn">${t('modal.approve')}</button>
+      </div>` : ''}
       ${task.assignee ? `<div>
         <div class="modal-label">${t('modal.assignee')}</div>
         <span style="font-size:13px">👤 ${escHtml(task.assignee)}</span>
@@ -555,6 +558,19 @@ function renderTaskModal(task, history, changes = [], isArchived = false) {
       ${historyHtml}
     </div>
   `;
+
+  const modalApproveBtn = document.getElementById('modalApproveBtn');
+  if (modalApproveBtn) {
+    modalApproveBtn.addEventListener('click', async () => {
+      try {
+        await api('PATCH', `/api/tasks/${task.id}/approve`);
+        await loadTasks();
+        closeModal('taskModal');
+      } catch (err) {
+        alert(t('modal.approveFailed') + ': ' + err.message);
+      }
+    });
+  }
 }
 
 // ── Modals ─────────────────────────────────────────────────────────────────
