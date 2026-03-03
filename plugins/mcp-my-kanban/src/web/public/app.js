@@ -260,9 +260,13 @@ function renderTagFilters() {
   optionsEl.appendChild(allOpt);
 
   allTags.forEach(tag => {
+    const count = state.tasks.filter(t => (t.tags || []).includes(tag)).length;
     const opt = document.createElement('div');
     opt.className = 'tag-option' + (state.activeTag === tag ? ' selected' : '');
-    opt.innerHTML = `<span class="tag-option-name">#${escHtml(formatTag(tag))}</span>`;
+    opt.innerHTML = `
+      <span class="tag-option-name">#${escHtml(formatTag(tag))}</span>
+      <span class="tag-option-count">${count}</span>
+    `;
     opt.addEventListener('click', () => selectTag(tag));
     optionsEl.appendChild(opt);
   });
