@@ -37,8 +37,16 @@
 
     <div class="header-field">
       <span class="header-label" data-i18n="header.tag">태그</span>
-      <div class="tag-filters" id="tagFilters">
-        <!-- rendered by JS -->
+      <div class="tag-dropdown" id="tagDropdown">
+        <button class="tag-trigger" id="tagTrigger">
+          <span class="tag-trigger-text">전체</span>
+          <svg class="tag-trigger-arrow" width="12" height="12" viewBox="0 0 12 12">
+            <path d="M3 5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+        </button>
+        <div class="tag-options" id="tagOptions">
+          <!-- rendered by JS -->
+        </div>
       </div>
     </div>
 

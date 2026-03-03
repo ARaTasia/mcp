@@ -122,24 +122,71 @@ select {
 }
 select:focus { border-color: var(--accent); }
 
-.tag-filters { display: flex; gap: 4px; }
+/* ── Tag dropdown ─────────────────────────────────────────────────────── */
 
-.tag-btn {
-  padding: 4px 10px;
-  border-radius: 20px;
+.tag-dropdown { position: relative; }
+
+.tag-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface2);
+  color: var(--text);
   border: 1px solid var(--border-strong);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-family: var(--font-mono);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: var(--font);
   cursor: pointer;
-  transition: all 0.12s;
+  outline: none;
+  min-width: 100px;
+  transition: border-color 0.12s;
 }
-.tag-btn:hover { color: var(--text); border-color: var(--border-strong); }
-.tag-btn.active {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-dim);
+.tag-trigger:hover { border-color: var(--text-subtle); }
+.tag-trigger:focus,
+.tag-dropdown.open .tag-trigger { border-color: var(--accent); }
+
+.tag-trigger-text { flex: 1; text-align: left; white-space: nowrap; }
+
+.tag-trigger-arrow { flex-shrink: 0; transition: transform 0.15s; }
+.tag-dropdown.open .tag-trigger-arrow { transform: rotate(180deg); }
+
+.tag-options {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: 240px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 50;
+}
+.tag-dropdown.open .tag-options { display: block; }
+
+.tag-options::-webkit-scrollbar { width: 3px; }
+.tag-options::-webkit-scrollbar-track { background: transparent; }
+.tag-options::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+
+.tag-option {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-bottom: 1px solid var(--border);
+}
+.tag-option:last-child { border-bottom: none; }
+.tag-option:hover { background: var(--surface2); }
+.tag-option.selected { background: var(--accent-dim); }
+
+.tag-option-name {
+  font-size: 13px;
+  color: var(--text);
+  font-family: var(--font-mono);
 }
 
 .btn {

@@ -245,28 +245,44 @@ function renderProjectSelect() {
 
 function renderTagFilters() {
   const allTags = [...new Set(state.tasks.flatMap(t => t.tags || []))].sort();
-  const container = document.getElementById('tagFilters');
+  const trigger = document.getElementById('tagTrigger');
+  const optionsEl = document.getElementById('tagOptions');
 
-  let sel = document.getElementById('tagSelect');
-  if (!sel) {
-    sel = document.createElement('select');
-    sel.id = 'tagSelect';
-    container.innerHTML = '';
-    container.appendChild(sel);
-    sel.addEventListener('change', (e) => {
-      state.activeTag = e.target.value;
-      renderBoard();
-      renderTagFilters();
-    });
-  }
+  trigger.querySelector('.tag-trigger-text').textContent =
+    state.activeTag ? `#${formatTag(state.activeTag)}` : t('header.all');
 
-  sel.innerHTML = `<option value="">${t('header.all')}</option>`;
+  optionsEl.innerHTML = '';
+
+  const allOpt = document.createElement('div');
+  allOpt.className = 'tag-option' + (!state.activeTag ? ' selected' : '');
+  allOpt.innerHTML = `<span class="tag-option-name">${t('header.all')}</span>`;
+  allOpt.addEventListener('click', () => selectTag(''));
+  optionsEl.appendChild(allOpt);
+
   allTags.forEach(tag => {
-    const opt = document.createElement('option');
-    opt.value = tag;
-    opt.textContent = `#${formatTag(tag)}`;
-    if (state.activeTag === tag) opt.selected = true;
-    sel.appendChild(opt);
+    const opt = document.createElement('div');
+    opt.className = 'tag-option' + (state.activeTag === tag ? ' selected' : '');
+    opt.innerHTML = `<span class="tag-option-name">#${escHtml(formatTag(tag))}</span>`;
+    opt.addEventListener('click', () => selectTag(tag));
+    optionsEl.appendChild(opt);
+  });
+}
+
+function selectTag(tag) {
+  state.activeTag = tag;
+  document.getElementById('tagDropdown').classList.remove('open');
+  renderBoard();
+  renderTagFilters();
+}
+
+function setupTagDropdown() {
+  const dropdown = document.getElementById('tagDropdown');
+  const trigger = document.getElementById('tagTrigger');
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('projectDropdown').classList.remove('open');
+    dropdown.classList.toggle('open');
   });
 }
 
@@ -654,11 +670,17 @@ document.getElementById('projectTrigger').addEventListener('click', (e) => {
 });
 
 document.addEventListener('click', (e) => {
-  const dropdown = document.getElementById('projectDropdown');
-  if (!dropdown.contains(e.target)) {
-    dropdown.classList.remove('open');
+  const projectDropdown = document.getElementById('projectDropdown');
+  if (!projectDropdown.contains(e.target)) {
+    projectDropdown.classList.remove('open');
+  }
+  const tagDropdown = document.getElementById('tagDropdown');
+  if (!tagDropdown.contains(e.target)) {
+    tagDropdown.classList.remove('open');
   }
 });
+
+setupTagDropdown();
 
 // ── Delete project ────────────────────────────────────────────────────────
 
