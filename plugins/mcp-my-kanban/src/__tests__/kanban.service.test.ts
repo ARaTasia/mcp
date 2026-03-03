@@ -5,7 +5,7 @@ import { db } from '../db/index.js';
 
 async function cleanDb() {
   await db.executeMultiple(
-    'DELETE FROM task_changes; DELETE FROM task_history; DELETE FROM tasks; DELETE FROM projects;',
+    'DELETE FROM archived_task_changes; DELETE FROM archived_task_history; DELETE FROM archived_tasks; DELETE FROM task_changes; DELETE FROM task_history; DELETE FROM tasks; DELETE FROM projects;',
   );
 }
 
@@ -81,70 +81,100 @@ describe('Task creation', () => {
 });
 
 describe('Status transitions', () => {
-  it('transitions todo → claimed → in_progress → review → done', async () => {
+  it('transitions todo → approved → in_progress → review → done (via complete)', async () => {
     const project = await kanbanService.createProject('Flow Project');
     const task = await kanbanService.createTask({ projectId: project.id, title: 'Flow Task' });
 
-    const claimed = await kanbanService.claimTask(task.id, 'agent-1');
-    expect(claimed.status).toBe('claimed');
-    expect(claimed.assignee).toBe('agent-1');
+    const approved = await kanbanService.approveTask(task.id);
+    expect(approved.status).toBe('approved');
 
     const started = await kanbanService.startTask(task.id, 'agent-1');
     expect(started.status).toBe('in_progress');
+    expect(started.assignee).toBe('agent-1');
 
     const reviewed = await kanbanService.submitReview(task.id, 'agent-1', 'Done!');
     expect(reviewed.status).toBe('review');
 
-    const done = await kanbanService.approveReview(task.id);
+    const done = await kanbanService.completeTask(task.id, 'agent-1');
     expect(done.status).toBe('done');
+    expect(done.done_at).toBeTruthy();
   });
 
-  it('reject moves task from review → claimed', async () => {
-    const project = await kanbanService.createProject('Reject Project');
-    const task = await kanbanService.createTask({ projectId: project.id, title: 'Reject Task' });
+  it('rework moves task from review → claimed', async () => {
+    const project = await kanbanService.createProject('Rework Project');
+    const task = await kanbanService.createTask({ projectId: project.id, title: 'Rework Task' });
 
-    await kanbanService.claimTask(task.id, 'agent-1');
+    await kanbanService.approveTask(task.id);
     await kanbanService.startTask(task.id, 'agent-1');
     await kanbanService.submitReview(task.id, 'agent-1', 'Review me');
 
-    const rejected = await kanbanService.rejectReview(task.id, 'Needs more work');
-    expect(rejected.status).toBe('claimed');
+    const reworked = await kanbanService.reworkTask(task.id, 'agent-1', 'Needs more work');
+    expect(reworked.status).toBe('claimed');
   });
 
-  it('blocks claiming a done task', async () => {
-    const project = await kanbanService.createProject('Done Project');
-    const task = await kanbanService.createTask({ projectId: project.id, title: 'Done Task' });
+  it('allows starting from claimed (rework) status', async () => {
+    const project = await kanbanService.createProject('Rework Start Project');
+    const task = await kanbanService.createTask({ projectId: project.id, title: 'Rework Start Task' });
 
-    await kanbanService.claimTask(task.id, 'agent-1');
+    await kanbanService.approveTask(task.id);
     await kanbanService.startTask(task.id, 'agent-1');
-    await kanbanService.submitReview(task.id, 'agent-1', 'Done');
-    await kanbanService.approveReview(task.id);
+    await kanbanService.submitReview(task.id, 'agent-1', 'Review me');
+    await kanbanService.reworkTask(task.id, 'agent-1', 'Fix this');
 
-    await expect(kanbanService.claimTask(task.id, 'agent-2')).rejects.toThrow('not in todo status');
+    const restarted = await kanbanService.startTask(task.id, 'agent-1');
+    expect(restarted.status).toBe('in_progress');
   });
 
-  it('blocks skipping from todo directly to in_progress', async () => {
-    const project = await kanbanService.createProject('Skip Project');
-    const task = await kanbanService.createTask({ projectId: project.id, title: 'Skip Task' });
+  it('blocks approving a non-todo task', async () => {
+    const project = await kanbanService.createProject('Approve Block Project');
+    const task = await kanbanService.createTask({ projectId: project.id, title: 'Approve Block Task' });
+    await kanbanService.approveTask(task.id);
 
-    await expect(kanbanService.startTask(task.id, 'agent-1')).rejects.toThrow('not in claimed status');
+    await expect(kanbanService.approveTask(task.id)).rejects.toThrow('not in todo status');
+  });
+
+  it('blocks starting a todo (unapproved) task', async () => {
+    const project = await kanbanService.createProject('Start Block Project');
+    const task = await kanbanService.createTask({ projectId: project.id, title: 'Start Block Task' });
+
+    await expect(kanbanService.startTask(task.id, 'agent-1')).rejects.toThrow('not in approved or claimed status');
+  });
+
+  it('blocks completing a non-review task', async () => {
+    const project = await kanbanService.createProject('Complete Block Project');
+    const task = await kanbanService.createTask({ projectId: project.id, title: 'Complete Block Task' });
+    await kanbanService.approveTask(task.id);
+    await kanbanService.startTask(task.id, 'agent-1');
+
+    await expect(kanbanService.completeTask(task.id, 'agent-1')).rejects.toThrow('not in review');
   });
 
   it('blocks starting a done task', async () => {
     const project = await kanbanService.createProject('Done Start Project');
     const task = await kanbanService.createTask({ projectId: project.id, title: 'Done Start Task' });
 
-    await kanbanService.claimTask(task.id, 'agent-1');
+    await kanbanService.approveTask(task.id);
     await kanbanService.startTask(task.id, 'agent-1');
     await kanbanService.submitReview(task.id, 'agent-1', 'Done');
-    await kanbanService.approveReview(task.id);
+    await kanbanService.completeTask(task.id, 'agent-1');
 
-    await expect(kanbanService.startTask(task.id, 'agent-1')).rejects.toThrow('not in claimed status');
+    await expect(kanbanService.startTask(task.id, 'agent-1')).rejects.toThrow('not in approved or claimed status');
+  });
+
+  it('legacy claim flow still works (todo → claimed → in_progress)', async () => {
+    const project = await kanbanService.createProject('Legacy Project');
+    const task = await kanbanService.createTask({ projectId: project.id, title: 'Legacy Task' });
+
+    const claimed = await kanbanService.claimTask(task.id, 'agent-1');
+    expect(claimed.status).toBe('claimed');
+
+    const started = await kanbanService.startTask(task.id, 'agent-1');
+    expect(started.status).toBe('in_progress');
   });
 });
 
 describe('Prerequisite validation', () => {
-  it('blocks claiming a task with incomplete prerequisites', async () => {
+  it('blocks starting an approved task with incomplete prerequisites', async () => {
     const project = await kanbanService.createProject('Prereq Project');
     const prereq = await kanbanService.createTask({ projectId: project.id, title: 'Prerequisite' });
     const dependent = await kanbanService.createTask({
@@ -153,12 +183,14 @@ describe('Prerequisite validation', () => {
       prerequisites: [prereq.id],
     });
 
-    await expect(kanbanService.claimTask(dependent.id, 'agent-1')).rejects.toThrow(
+    await kanbanService.approveTask(dependent.id);
+
+    await expect(kanbanService.startTask(dependent.id, 'agent-1')).rejects.toThrow(
       'Prerequisite tasks not done',
     );
   });
 
-  it('allows claiming when prerequisites are done', async () => {
+  it('allows starting when prerequisites are done', async () => {
     const project = await kanbanService.createProject('Prereq Done Project');
     const prereq = await kanbanService.createTask({ projectId: project.id, title: 'Prereq' });
     const dependent = await kanbanService.createTask({
@@ -168,13 +200,14 @@ describe('Prerequisite validation', () => {
     });
 
     // Complete the prerequisite
-    await kanbanService.claimTask(prereq.id, 'agent-1');
+    await kanbanService.approveTask(prereq.id);
     await kanbanService.startTask(prereq.id, 'agent-1');
     await kanbanService.submitReview(prereq.id, 'agent-1', 'Done');
-    await kanbanService.approveReview(prereq.id);
+    await kanbanService.completeTask(prereq.id, 'agent-1');
 
-    const claimed = await kanbanService.claimTask(dependent.id, 'agent-1');
-    expect(claimed.status).toBe('claimed');
+    await kanbanService.approveTask(dependent.id);
+    const started = await kanbanService.startTask(dependent.id, 'agent-1');
+    expect(started.status).toBe('in_progress');
   });
 });
 
@@ -239,5 +272,53 @@ describe('Circular prerequisite detection', () => {
         prerequisites: [taskA.id, taskB.id],
       }),
     ).resolves.not.toThrow();
+  });
+});
+
+describe('Archive', () => {
+  it('archives done tasks older than 1 month', async () => {
+    const project = await kanbanService.createProject('Archive Project');
+    const task = await kanbanService.createTask({ projectId: project.id, title: 'Old Task' });
+
+    await kanbanService.approveTask(task.id);
+    await kanbanService.startTask(task.id, 'agent-1');
+    await kanbanService.submitReview(task.id, 'agent-1', 'Done');
+    await kanbanService.completeTask(task.id, 'agent-1');
+
+    // Manually set done_at to 2 months ago
+    const twoMonthsAgo = Math.floor(Date.now() / 1000) - 60 * 24 * 60 * 60;
+    await db.execute({
+      sql: 'UPDATE tasks SET done_at = ? WHERE id = ?',
+      args: [twoMonthsAgo, task.id],
+    });
+
+    const result = await kanbanService.archiveOldTasks(project.id);
+    expect(result.archived).toBe(1);
+
+    // Task should be removed from active tasks
+    const tasks = await kanbanService.listTasks({ projectId: project.id });
+    expect(tasks.find(t => t.id === task.id)).toBeUndefined();
+
+    // Task should be in archive
+    const archived = await kanbanService.listArchivedTasks(project.id);
+    expect(archived.length).toBe(1);
+    expect(archived[0].id).toBe(task.id);
+
+    // Archived task detail should have history
+    const detail = await kanbanService.getArchivedTask(task.id);
+    expect(detail.history.length).toBeGreaterThan(0);
+  });
+
+  it('does not archive recent done tasks', async () => {
+    const project = await kanbanService.createProject('Recent Archive Project');
+    const task = await kanbanService.createTask({ projectId: project.id, title: 'Recent Task' });
+
+    await kanbanService.approveTask(task.id);
+    await kanbanService.startTask(task.id, 'agent-1');
+    await kanbanService.submitReview(task.id, 'agent-1', 'Done');
+    await kanbanService.completeTask(task.id, 'agent-1');
+
+    const result = await kanbanService.archiveOldTasks(project.id);
+    expect(result.archived).toBe(0);
   });
 });

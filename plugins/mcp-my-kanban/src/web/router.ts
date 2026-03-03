@@ -71,18 +71,26 @@ router.get('/api/tasks/:id', async (req, res) => {
 
 router.patch('/api/tasks/:id/approve', async (req, res) => {
   try {
-    res.json(await kanbanService.approveReview(req.params.id));
+    res.json(await kanbanService.approveTask(req.params.id));
   } catch (e) {
     res.status(400).json({ error: (e as Error).message });
   }
 });
 
-router.patch('/api/tasks/:id/reject', async (req, res) => {
+router.get('/api/archived-tasks', async (req, res) => {
   try {
-    const { reason } = req.body as { reason?: string };
-    res.json(await kanbanService.rejectReview(req.params.id, reason));
+    const { projectId } = req.query as Record<string, string>;
+    res.json(await kanbanService.listArchivedTasks(projectId));
   } catch (e) {
-    res.status(400).json({ error: (e as Error).message });
+    res.status(500).json({ error: (e as Error).message });
+  }
+});
+
+router.get('/api/archived-tasks/:id', async (req, res) => {
+  try {
+    res.json(await kanbanService.getArchivedTask(req.params.id));
+  } catch (e) {
+    res.status(404).json({ error: (e as Error).message });
   }
 });
 

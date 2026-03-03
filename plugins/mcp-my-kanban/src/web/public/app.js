@@ -1,20 +1,63 @@
 // Kanban MCP - Web UI
 'use strict';
 
+// ── i18n ────────────────────────────────────────────────────────────────────
+
+const I18N = {
+  ko: {
+    columns: { todo: '미승인', approved: '승인', claimed: '재작업', in_progress: '진행중', review: '리뷰', done: '완료' },
+    header: { project: '프로젝트', tag: '태그', newTask: '+ 새 작업', all: '전체', delete: '삭제' },
+    modal: { desc: '설명', status: '상태', assignee: '담당자', tags: '태그', prereqs: '전제조건', none: '없음',
+             history: '히스토리', noHistory: '히스토리 없음', changes: '변경 내역', archive: '보관함',
+             approve: '승인', createTitle: '새 작업 만들기', title: '제목', description: '설명',
+             assigneePlaceholder: '에이전트 이름 (선택)', tagsPlaceholder: 'backend, frontend, db',
+             prereqsPlaceholder: 'task_id1, task_id2', cancel: '취소', create: '만들기',
+             deleteProject: '프로젝트 삭제', deleteConfirm: '삭제', deleteMsg: '프로젝트를 삭제하시겠습니까?',
+             deleteWarning: '이 프로젝트에 작업이 있습니다.', deleteWarningDetail: '삭제하면 모든 작업과 히스토리가 함께 삭제됩니다.',
+             titleRequired: '제목을 입력하세요.', projectRequired: '프로젝트를 선택해 주세요.',
+             createFailed: '생성 실패', approveFailed: '승인 실패', deleteFailed: '삭제 실패' },
+    time: { sec: '초 전', min: '분 전', hour: '시간 전', day: '일 전' },
+    empty: '없음',
+  },
+  en: {
+    columns: { todo: 'Unapproved', approved: 'Approved', claimed: 'Rework', in_progress: 'In Progress', review: 'Review', done: 'Done' },
+    header: { project: 'Project', tag: 'Tag', newTask: '+ New Task', all: 'All', delete: 'Delete' },
+    modal: { desc: 'Description', status: 'Status', assignee: 'Assignee', tags: 'Tags', prereqs: 'Prerequisites', none: 'None',
+             history: 'History', noHistory: 'No history', changes: 'Changes', archive: 'Archive',
+             approve: 'Approve', createTitle: 'Create Task', title: 'Title', description: 'Description',
+             assigneePlaceholder: 'Agent name (optional)', tagsPlaceholder: 'backend, frontend, db',
+             prereqsPlaceholder: 'task_id1, task_id2', cancel: 'Cancel', create: 'Create',
+             deleteProject: 'Delete Project', deleteConfirm: 'Delete', deleteMsg: 'Delete this project?',
+             deleteWarning: 'This project has tasks.', deleteWarningDetail: 'All tasks and history will be deleted.',
+             titleRequired: 'Title is required.', projectRequired: 'Please select a project.',
+             createFailed: 'Create failed', approveFailed: 'Approve failed', deleteFailed: 'Delete failed' },
+    time: { sec: 's ago', min: 'm ago', hour: 'h ago', day: 'd ago' },
+    empty: 'None',
+  },
+};
+
+function t(path) {
+  return path.split('.').reduce((o, k) => o?.[k], I18N[state.lang]) ?? path;
+}
+
 const COLUMNS = [
-  { key: 'todo',        label: 'To Do' },
-  { key: 'claimed',     label: 'Claimed' },
-  { key: 'in_progress', label: 'In Progress' },
-  { key: 'review',      label: 'Review' },
-  { key: 'done',        label: 'Done' },
+  { key: 'todo' },
+  { key: 'approved' },
+  { key: 'claimed' },
+  { key: 'in_progress' },
+  { key: 'review' },
+  { key: 'done' },
 ];
 
 let state = {
   projects: [],
   tasks: [],
+  archivedTasks: [],
   selectedProject: '',
   activeTag: '',
   openTaskId: null,
+  lang: localStorage.getItem('kanban-lang') || 'ko',
+  archiveOpen: false,
 };
 
 // ── Utils ──────────────────────────────────────────────────────────────────
@@ -34,10 +77,10 @@ async function api(method, path, body) {
 
 function timeAgo(unixSec) {
   const diff = Math.floor(Date.now() / 1000) - unixSec;
-  if (diff < 60) return `${diff}초 전`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
-  return `${Math.floor(diff / 86400)}일 전`;
+  if (diff < 60) return `${diff}${t('time.sec')}`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}${t('time.min')}`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}${t('time.hour')}`;
+  return `${Math.floor(diff / 86400)}${t('time.day')}`;
 }
 
 function tagClass(tag) {
@@ -80,10 +123,15 @@ async function loadProjects() {
 async function loadTasks() {
   const qs = new URLSearchParams();
   if (state.selectedProject) qs.set('projectId', state.selectedProject);
-  // Tag filtering is done client-side after loading all tasks
   state.tasks = await api('GET', `/api/tasks?${qs}`);
   renderBoard();
   renderTagFilters();
+}
+
+async function loadArchivedTasks() {
+  const qs = new URLSearchParams();
+  if (state.selectedProject) qs.set('projectId', state.selectedProject);
+  state.archivedTasks = await api('GET', `/api/archived-tasks?${qs}`);
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -98,6 +146,61 @@ function formatProjectName(project) {
   return project.name;
 }
 
+// ── Language ──────────────────────────────────────────────────────────────
+
+function setLang(lang) {
+  state.lang = lang;
+  localStorage.setItem('kanban-lang', lang);
+  updateLangToggle();
+  updateStaticI18n();
+  renderProjectSelect();
+  renderBoard();
+  renderTagFilters();
+}
+
+function updateLangToggle() {
+  document.getElementById('langToggle').textContent = '🌐 ' + state.lang.toUpperCase();
+}
+
+function updateStaticI18n() {
+  // Update static elements with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    el.textContent = t(key);
+  });
+
+  // Update create task modal labels
+  const createModal = document.getElementById('createTaskModal');
+  if (createModal) {
+    createModal.querySelector('.modal-title').textContent = t('modal.createTitle');
+    const labels = createModal.querySelectorAll('.form-group label');
+    if (labels[0]) labels[0].textContent = t('header.project') + ' *';
+    if (labels[1]) labels[1].textContent = t('modal.title') + ' *';
+    if (labels[2]) labels[2].textContent = t('modal.description');
+    if (labels[3]) labels[3].textContent = t('modal.assignee');
+    if (labels[4]) labels[4].textContent = t('modal.tags') + ' (,)';
+    if (labels[5]) labels[5].textContent = t('modal.prereqs') + ' Task ID (,)';
+  }
+
+  // Update placeholders
+  const el = (id) => document.getElementById(id);
+  if (el('newTaskAssignee')) el('newTaskAssignee').placeholder = t('modal.assigneePlaceholder');
+  if (el('newTaskTags')) el('newTaskTags').placeholder = t('modal.tagsPlaceholder');
+  if (el('newTaskPrereqs')) el('newTaskPrereqs').placeholder = t('modal.prereqsPlaceholder');
+
+  // Update buttons
+  if (el('createTaskCancel')) el('createTaskCancel').textContent = t('modal.cancel');
+  if (el('createTaskSubmit')) el('createTaskSubmit').textContent = t('modal.create');
+
+  // Update delete modal
+  const delModal = document.getElementById('deleteProjectModal');
+  if (delModal) {
+    delModal.querySelector('.modal-title').textContent = t('modal.deleteProject');
+    if (el('deleteProjectCancel')) el('deleteProjectCancel').textContent = t('modal.cancel');
+    if (el('deleteProjectConfirm')) el('deleteProjectConfirm').textContent = t('modal.deleteConfirm');
+  }
+}
+
 // ── Render ─────────────────────────────────────────────────────────────────
 
 function renderProjectSelect() {
@@ -109,16 +212,16 @@ function renderProjectSelect() {
   // Update trigger text
   const selected = state.projects.find(p => p.id === state.selectedProject);
   trigger.querySelector('.project-trigger-text').textContent =
-    selected ? formatProjectName(selected) : '전체';
-  trigger.title = selected?.workspace_path || selected?.name || '전체';
+    selected ? formatProjectName(selected) : t('header.all');
+  trigger.title = selected?.workspace_path || selected?.name || t('header.all');
 
   // Build options list
   optionsEl.innerHTML = '';
 
-  // "전체" option
+  // "All" option
   const allOpt = document.createElement('div');
   allOpt.className = 'project-option' + (!state.selectedProject ? ' selected' : '');
-  allOpt.innerHTML = '<span class="project-option-name">전체</span>';
+  allOpt.innerHTML = `<span class="project-option-name">${t('header.all')}</span>`;
   allOpt.addEventListener('click', () => selectProject(''));
   optionsEl.appendChild(allOpt);
 
@@ -155,7 +258,7 @@ function renderTagFilters() {
     });
   }
 
-  sel.innerHTML = '<option value="">전체</option>';
+  sel.innerHTML = `<option value="">${t('header.all')}</option>`;
   allTags.forEach(tag => {
     const opt = document.createElement('option');
     opt.value = tag;
@@ -181,7 +284,7 @@ function renderBoard() {
     colEl.className = `column col-${col.key}`;
     colEl.innerHTML = `
       <div class="col-header">
-        <span class="col-title">${col.label}</span>
+        <span class="col-title">${t('columns.' + col.key)}</span>
         <span class="col-count">${tasks.length}</span>
       </div>
       <div class="cards-container" id="col-${col.key}"></div>
@@ -191,12 +294,62 @@ function renderBoard() {
     const container = colEl.querySelector(`#col-${col.key}`);
 
     if (tasks.length === 0) {
-      container.innerHTML = '<div class="empty-state">없음</div>';
+      container.innerHTML = `<div class="empty-state">${t('empty')}</div>`;
     } else {
       tasks.forEach((task, i) => {
         container.appendChild(renderCard(task, i));
       });
     }
+
+    // Archive section in Done column
+    if (col.key === 'done') {
+      const archiveSection = document.createElement('div');
+      archiveSection.className = 'archive-section';
+      archiveSection.innerHTML = `
+        <button class="archive-toggle" id="archiveToggle">
+          <span class="archive-toggle-arrow${state.archiveOpen ? ' open' : ''}" id="archiveArrow">▶</span>
+          <span>${t('modal.archive')} (${state.archivedTasks.length})</span>
+        </button>
+        <div class="archive-list" id="archiveList" style="display:${state.archiveOpen ? 'flex' : 'none'}"></div>
+      `;
+      container.appendChild(archiveSection);
+
+      const toggleBtn = archiveSection.querySelector('#archiveToggle');
+      toggleBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        state.archiveOpen = !state.archiveOpen;
+        if (state.archiveOpen && state.archivedTasks.length === 0) {
+          await loadArchivedTasks();
+        }
+        renderArchiveList();
+        document.getElementById('archiveArrow').classList.toggle('open', state.archiveOpen);
+        document.getElementById('archiveList').style.display = state.archiveOpen ? 'flex' : 'none';
+      });
+
+      if (state.archiveOpen) {
+        renderArchiveList();
+      }
+    }
+  });
+}
+
+function renderArchiveList() {
+  const list = document.getElementById('archiveList');
+  if (!list) return;
+  if (state.archivedTasks.length === 0) {
+    list.innerHTML = `<div class="empty-state">${t('empty')}</div>`;
+    return;
+  }
+  list.innerHTML = '';
+  state.archivedTasks.forEach(task => {
+    const card = document.createElement('div');
+    card.className = 'archive-card';
+    card.textContent = task.title;
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openArchivedTaskDetail(task.id);
+    });
+    list.appendChild(card);
   });
 }
 
@@ -212,6 +365,11 @@ function renderCard(task, index = 0) {
     ? `<span class="card-assignee">${task.assignee}</span>`
     : '';
 
+  // Approve button for todo (unapproved) tasks
+  const approveHtml = (task.status === 'todo' && !locked)
+    ? `<button class="card-approve-btn" data-approve-id="${task.id}">${t('modal.approve')}</button>`
+    : '';
+
   card.innerHTML = `
     <div class="card-header">
       ${lockIcon}
@@ -221,9 +379,28 @@ function renderCard(task, index = 0) {
     <div class="card-meta">
       ${assigneeHtml}
     </div>
+    ${approveHtml}
   `;
 
-  card.addEventListener('click', () => openTaskDetail(task.id));
+  card.addEventListener('click', (e) => {
+    if (e.target.classList.contains('card-approve-btn')) return;
+    openTaskDetail(task.id);
+  });
+
+  // Wire approve button
+  const approveBtn = card.querySelector('.card-approve-btn');
+  if (approveBtn) {
+    approveBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await api('PATCH', `/api/tasks/${task.id}/approve`);
+        await loadTasks();
+      } catch (err) {
+        alert(t('modal.approveFailed') + ': ' + err.message);
+      }
+    });
+  }
+
   return card;
 }
 
@@ -248,6 +425,22 @@ async function openTaskDetail(taskId) {
   try {
     const { task, history, changes } = await api('GET', `/api/tasks/${taskId}`);
     renderTaskModal(task, history, changes ?? []);
+  } catch (e) {
+    document.getElementById('modalBody').innerHTML = `<p style="color:var(--red)">${e.message}</p>`;
+  }
+}
+
+async function openArchivedTaskDetail(taskId) {
+  state.openTaskId = taskId;
+  const modal = document.getElementById('taskModal');
+  modal.classList.add('open');
+
+  document.getElementById('modalTitle').textContent = 'Loading...';
+  document.getElementById('modalBody').innerHTML = '';
+
+  try {
+    const { task, history, changes } = await api('GET', `/api/archived-tasks/${taskId}`);
+    renderTaskModal(task, history, changes ?? [], true);
   } catch (e) {
     document.getElementById('modalBody').innerHTML = `<p style="color:var(--red)">${e.message}</p>`;
   }
@@ -278,12 +471,12 @@ function renderDiff(diffText) {
   }).join('');
 }
 
-function renderTaskModal(task, history, changes = []) {
+function renderTaskModal(task, history, changes = [], isArchived = false) {
   document.getElementById('modalTitle').textContent = task.title;
 
   const prereqs = task.prerequisites || [];
   const prereqHtml = prereqs.length === 0
-    ? '<span style="color:var(--text-muted);font-size:12px">없음</span>'
+    ? `<span style="color:var(--text-muted);font-size:12px">${t('modal.none')}</span>`
     : `<div class="prereq-list">${prereqs.map(pid => {
         const p = state.tasks.find(t => t.id === pid);
         const done = p && p.status === 'done';
@@ -295,7 +488,7 @@ function renderTaskModal(task, history, changes = []) {
       }).join('')}</div>`;
 
   const historyHtml = history.length === 0
-    ? '<div class="empty-state">히스토리 없음</div>'
+    ? `<div class="empty-state">${t('modal.noHistory')}</div>`
     : `<div class="history-list">${history.map(h => `
         <div class="history-item">
           <div class="history-dot"></div>
@@ -312,57 +505,38 @@ function renderTaskModal(task, history, changes = []) {
           <div class="history-time">${timeAgo(h.created_at)}</div>
         </div>`).join('')}</div>`;
 
-  const reviewActionsHtml = task.status === 'review'
-    ? `<div class="modal-section">
-        <div class="modal-label">리뷰 액션</div>
-        <div class="review-actions">
-          <div class="review-btns">
-            <button class="btn btn-success" id="approveBtn">✓ 승인</button>
-            <button class="btn btn-danger" id="rejectToggleBtn">✗ 반려</button>
-          </div>
-          <div class="reject-form" id="rejectForm">
-            <textarea id="rejectReason" placeholder="요청사항 입력 (선택사항)"></textarea>
-            <div style="display:flex;gap:8px;justify-content:flex-end;">
-              <button class="btn btn-ghost" id="rejectCancelBtn">취소</button>
-              <button class="btn btn-danger" id="rejectConfirmBtn">반려 확인</button>
-            </div>
-          </div>
-        </div>
-      </div>`
-    : '';
+  const statusLabel = isArchived ? 'done (archived)' : task.status;
 
   document.getElementById('modalBody').innerHTML = `
     ${task.description ? `
     <div class="modal-section">
-      <div class="modal-label">설명</div>
+      <div class="modal-label">${t('modal.desc')}</div>
       <div class="modal-desc">${escHtml(task.description)}</div>
     </div>` : ''}
 
     <div class="modal-section" style="display:flex;gap:16px;flex-wrap:wrap;">
       <div>
-        <div class="modal-label">상태</div>
-        <span class="status-badge status-${task.status}">${task.status}</span>
+        <div class="modal-label">${t('modal.status')}</div>
+        <span class="status-badge status-${task.status || 'done'}">${statusLabel}</span>
       </div>
       ${task.assignee ? `<div>
-        <div class="modal-label">담당자</div>
+        <div class="modal-label">${t('modal.assignee')}</div>
         <span style="font-size:13px">👤 ${escHtml(task.assignee)}</span>
       </div>` : ''}
       ${task.tags && task.tags.length ? `<div>
-        <div class="modal-label">태그</div>
+        <div class="modal-label">${t('modal.tags')}</div>
         <div class="tags">${tagsHtml(task.tags)}</div>
       </div>` : ''}
     </div>
 
     <div class="modal-section">
-      <div class="modal-label">전제조건</div>
+      <div class="modal-label">${t('modal.prereqs')}</div>
       ${prereqHtml}
     </div>
 
-    ${reviewActionsHtml}
-
     ${changes.length > 0 ? `
     <div class="modal-section">
-      <div class="modal-label">변경 내역</div>
+      <div class="modal-label">${t('modal.changes')}</div>
       <div class="change-list">
         ${changes.map(c => `
           <div class="change-item">
@@ -377,53 +551,10 @@ function renderTaskModal(task, history, changes = []) {
     </div>` : ''}
 
     <div class="modal-section">
-      <div class="modal-label">히스토리</div>
+      <div class="modal-label">${t('modal.history')}</div>
       ${historyHtml}
     </div>
   `;
-
-  // Wire up review buttons
-  if (task.status === 'review') {
-    document.getElementById('approveBtn').addEventListener('click', async () => {
-      await handleApprove(task.id);
-    });
-
-    document.getElementById('rejectToggleBtn').addEventListener('click', () => {
-      document.getElementById('rejectForm').classList.add('open');
-      document.getElementById('rejectToggleBtn').style.display = 'none';
-    });
-
-    document.getElementById('rejectCancelBtn').addEventListener('click', () => {
-      document.getElementById('rejectForm').classList.remove('open');
-      document.getElementById('rejectToggleBtn').style.display = '';
-      document.getElementById('rejectReason').value = '';
-    });
-
-    document.getElementById('rejectConfirmBtn').addEventListener('click', async () => {
-      const reason = document.getElementById('rejectReason').value.trim();
-      await handleReject(task.id, reason);
-    });
-  }
-}
-
-async function handleApprove(taskId) {
-  try {
-    await api('PATCH', `/api/tasks/${taskId}/approve`);
-    closeModal('taskModal');
-    await loadTasks();
-  } catch (e) {
-    alert('승인 실패: ' + e.message);
-  }
-}
-
-async function handleReject(taskId, reason) {
-  try {
-    await api('PATCH', `/api/tasks/${taskId}/reject`, { reason });
-    closeModal('taskModal');
-    await loadTasks();
-  } catch (e) {
-    alert('반려 실패: ' + e.message);
-  }
 }
 
 // ── Modals ─────────────────────────────────────────────────────────────────
@@ -442,7 +573,7 @@ document.getElementById('taskModal').addEventListener('click', e => {
 document.getElementById('newTaskBtn').addEventListener('click', () => {
   // Populate project dropdown
   const sel = document.getElementById('newTaskProject');
-  sel.innerHTML = '<option value="">— 프로젝트 선택 —</option>';
+  sel.innerHTML = `<option value="">— ${t('header.project')} —</option>`;
   state.projects.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p.id;
@@ -451,7 +582,7 @@ document.getElementById('newTaskBtn').addEventListener('click', () => {
     sel.appendChild(opt);
   });
 
-  // Show project selector only in "전체" mode
+  // Show project selector only in "All" mode
   const group = document.getElementById('modalProjectGroup');
   group.style.display = state.selectedProject ? 'none' : '';
 
@@ -466,10 +597,10 @@ document.getElementById('createTaskModal').addEventListener('click', e => {
 
 document.getElementById('createTaskSubmit').addEventListener('click', async () => {
   const title = document.getElementById('newTaskTitle').value.trim();
-  if (!title) return alert('제목을 입력하세요.');
+  if (!title) return alert(t('modal.titleRequired'));
 
   const projectId = state.selectedProject || document.getElementById('newTaskProject').value;
-  if (!projectId) return alert('프로젝트를 선택해 주세요.');
+  if (!projectId) return alert(t('modal.projectRequired'));
 
   const desc = document.getElementById('newTaskDesc').value.trim() || undefined;
   const assignee = document.getElementById('newTaskAssignee').value.trim() || undefined;
@@ -494,7 +625,7 @@ document.getElementById('createTaskSubmit').addEventListener('click', async () =
     });
     await loadTasks();
   } catch (e) {
-    alert('생성 실패: ' + e.message);
+    alert(t('modal.createFailed') + ': ' + e.message);
   }
 });
 
@@ -503,6 +634,8 @@ document.getElementById('createTaskSubmit').addEventListener('click', async () =
 async function selectProject(id) {
   state.selectedProject = id;
   state.activeTag = '';
+  state.archivedTasks = [];
+  state.archiveOpen = false;
   document.getElementById('projectDropdown').classList.remove('open');
   renderProjectSelect();
   await loadTasks();
@@ -530,10 +663,15 @@ document.getElementById('deleteProjectBtn').addEventListener('click', () => {
   if (!project) return;
 
   document.getElementById('deleteProjectMsg').textContent =
-    `"${formatProjectName(project)}" 프로젝트를 삭제하시겠습니까?`;
+    `"${formatProjectName(project)}" ${t('modal.deleteMsg')}`;
 
   const hasTasks = state.tasks.length > 0;
-  document.getElementById('deleteProjectTaskWarning').style.display = hasTasks ? '' : 'none';
+  const warning = document.getElementById('deleteProjectTaskWarning');
+  warning.style.display = hasTasks ? '' : 'none';
+  if (hasTasks) {
+    warning.querySelector('p:first-child').textContent = t('modal.deleteWarning');
+    warning.querySelector('p:last-child').textContent = t('modal.deleteWarningDetail');
+  }
 
   document.getElementById('deleteProjectModal').classList.add('open');
 });
@@ -554,11 +692,15 @@ document.getElementById('deleteProjectConfirm').addEventListener('click', async 
     state.selectedProject = '';
     await Promise.all([loadProjects(), loadTasks()]);
   } catch (e) {
-    alert('삭제 실패: ' + e.message);
+    alert(t('modal.deleteFailed') + ': ' + e.message);
   }
 });
 
-// Tag filter select is wired up inside renderTagFilters()
+// ── Language toggle ───────────────────────────────────────────────────────
+
+document.getElementById('langToggle').addEventListener('click', () => {
+  setLang(state.lang === 'ko' ? 'en' : 'ko');
+});
 
 // ── WebSocket ──────────────────────────────────────────────────────────────
 
@@ -625,6 +767,13 @@ function connectWS() {
         renderTagFilters();
       }
       renderProjectSelect();
+    } else if (type === 'tasks_archived') {
+      // Reload tasks and archived tasks
+      await loadTasks();
+      if (state.archiveOpen) {
+        await loadArchivedTasks();
+        renderArchiveList();
+      }
     }
   };
 }
@@ -639,6 +788,8 @@ function updateWsStatus(connected) {
 // ── Init ───────────────────────────────────────────────────────────────────
 
 (async function init() {
+  updateLangToggle();
+  updateStaticI18n();
   connectWS();
   await Promise.all([loadProjects(), loadTasks()]);
 })();

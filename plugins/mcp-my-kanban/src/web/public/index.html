@@ -12,7 +12,7 @@
 <body>
 
 <header class="header">
-  <div class="header-brand">
+  <div class="header-left">
     <h1>Kanban<span>MCP</span></h1>
     <div class="ws-status">
       <div class="ws-dot" id="wsDot"></div>
@@ -20,9 +20,9 @@
     </div>
   </div>
 
-  <div class="header-controls">
+  <div class="header-center">
     <div class="header-field">
-      <span class="header-label">프로젝트</span>
+      <span class="header-label" data-i18n="header.project">프로젝트</span>
       <div class="project-dropdown" id="projectDropdown">
         <button class="project-trigger" id="projectTrigger">
           <span class="project-trigger-text">전체</span>
@@ -32,17 +32,21 @@
           <!-- rendered by JS -->
         </div>
       </div>
-      <button class="btn btn-danger project-delete-btn" id="deleteProjectBtn" style="display:none" title="프로젝트 삭제">삭제</button>
+      <button class="btn btn-danger project-delete-btn" id="deleteProjectBtn" style="display:none" data-i18n="header.delete">삭제</button>
     </div>
 
     <div class="header-field">
-      <span class="header-label">태그</span>
+      <span class="header-label" data-i18n="header.tag">태그</span>
       <div class="tag-filters" id="tagFilters">
         <!-- rendered by JS -->
       </div>
     </div>
 
-    <button class="btn btn-primary" id="newTaskBtn">+ 새 작업</button>
+    <button class="btn btn-primary" id="newTaskBtn" data-i18n="header.newTask">+ 새 작업</button>
+  </div>
+
+  <div class="header-right">
+    <button class="lang-toggle" id="langToggle">🌐 KO</button>
   </div>
 </header>
 

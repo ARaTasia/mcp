@@ -13,7 +13,7 @@ function rowToObj(rs: ResultSet, row: Row): Record<string, InValue> {
   return obj;
 }
 
-export type TaskStatus = 'todo' | 'claimed' | 'in_progress' | 'review' | 'done';
+export type TaskStatus = 'todo' | 'approved' | 'claimed' | 'in_progress' | 'review' | 'done';
 
 export interface Task {
   id: string;
@@ -27,6 +27,22 @@ export interface Task {
   sort_order: number;
   created_at: number;
   updated_at: number;
+  done_at: number | null;
+}
+
+export interface ArchivedTask {
+  id: string;
+  project_id: string;
+  title: string;
+  description: string | null;
+  tags: string[];
+  assignee: string | null;
+  prerequisites: string[];
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+  done_at: number | null;
+  archived_at: number;
 }
 
 export interface HistoryEntry {
@@ -72,6 +88,24 @@ function parseTask(obj: Record<string, InValue>): Task {
     sort_order: obj.sort_order as number,
     created_at: obj.created_at as number,
     updated_at: obj.updated_at as number,
+    done_at: (obj.done_at as number | null) ?? null,
+  };
+}
+
+function parseArchivedTask(obj: Record<string, InValue>): ArchivedTask {
+  return {
+    id: obj.id as string,
+    project_id: obj.project_id as string,
+    title: obj.title as string,
+    description: obj.description as string | null,
+    tags: JSON.parse((obj.tags as string) ?? '[]'),
+    assignee: obj.assignee as string | null,
+    prerequisites: JSON.parse((obj.prerequisites as string) ?? '[]'),
+    sort_order: obj.sort_order as number,
+    created_at: obj.created_at as number,
+    updated_at: obj.updated_at as number,
+    done_at: (obj.done_at as number | null) ?? null,
+    archived_at: obj.archived_at as number,
   };
 }
 
@@ -200,6 +234,19 @@ export class KanbanService {
       await db.execute({ sql: 'DELETE FROM tasks WHERE project_id = ?', args: [projectId] });
     }
 
+    // Clean archive tables
+    if (force) {
+      await db.execute({
+        sql: 'DELETE FROM archived_task_changes WHERE task_id IN (SELECT id FROM archived_tasks WHERE project_id = ?)',
+        args: [projectId],
+      });
+      await db.execute({
+        sql: 'DELETE FROM archived_task_history WHERE task_id IN (SELECT id FROM archived_tasks WHERE project_id = ?)',
+        args: [projectId],
+      });
+      await db.execute({ sql: 'DELETE FROM archived_tasks WHERE project_id = ?', args: [projectId] });
+    }
+
     await db.execute({ sql: 'DELETE FROM projects WHERE id = ?', args: [projectId] });
 
     // Clean up .kanban file if workspace_path exists
@@ -213,6 +260,9 @@ export class KanbanService {
   }
 
   async listTasks(opts: { projectId?: string; status?: string; tags?: string[] } = {}): Promise<Task[]> {
+    // Lazy archive: move old done tasks to archive on list
+    await this.archiveOldTasks(opts.projectId).catch(() => {});
+
     let sql = 'SELECT * FROM tasks WHERE 1=1';
     const args: InValue[] = [];
 
@@ -352,14 +402,15 @@ export class KanbanService {
     if (!row) throw new Error(`Task not found: ${taskId}`);
     const fromStatus = row.status as string;
 
+    const doneAtClause = toStatus === 'done' ? ', done_at = unixepoch()' : '';
     if (assignee !== undefined) {
       await db.execute({
-        sql: 'UPDATE tasks SET status = ?, assignee = ?, updated_at = unixepoch() WHERE id = ?',
+        sql: `UPDATE tasks SET status = ?, assignee = ?, updated_at = unixepoch()${doneAtClause} WHERE id = ?`,
         args: [toStatus, assignee, taskId],
       });
     } else {
       await db.execute({
-        sql: 'UPDATE tasks SET status = ?, updated_at = unixepoch() WHERE id = ?',
+        sql: `UPDATE tasks SET status = ?, updated_at = unixepoch()${doneAtClause} WHERE id = ?`,
         args: [toStatus, taskId],
       });
     }
@@ -393,9 +444,28 @@ export class KanbanService {
   }
 
   async startTask(taskId: string, agentName: string): Promise<Task> {
-    const row = await queryOne('SELECT status FROM tasks WHERE id = ?', [taskId]);
+    const row = await queryOne('SELECT * FROM tasks WHERE id = ?', [taskId]);
     if (!row) throw new Error(`Task not found: ${taskId}`);
-    if (row.status !== 'claimed') throw new Error(`Task is not in claimed status: ${row.status}`);
+    if (row.status !== 'approved' && row.status !== 'claimed') {
+      throw new Error(`Task is not in approved or claimed status: ${row.status}`);
+    }
+
+    // When starting from approved, validate prerequisites and set assignee
+    if (row.status === 'approved') {
+      const prerequisites: string[] = JSON.parse((row.prerequisites as string) ?? '[]');
+      if (prerequisites.length > 0) {
+        const notDone: string[] = [];
+        for (const prereqId of prerequisites) {
+          const p = await queryOne('SELECT status FROM tasks WHERE id = ?', [prereqId]);
+          if (!p || p.status !== 'done') notDone.push(prereqId);
+        }
+        if (notDone.length > 0) {
+          throw new Error(`Prerequisite tasks not done: [${notDone.join(', ')}]`);
+        }
+      }
+      return this.moveTask(taskId, 'in_progress', agentName, 'start', undefined, agentName);
+    }
+
     return this.moveTask(taskId, 'in_progress', agentName, 'start');
   }
 
@@ -449,19 +519,105 @@ export class KanbanService {
     return task;
   }
 
-  async approveReview(taskId: string): Promise<Task> {
+  async approveTask(taskId: string): Promise<Task> {
     const row = await queryOne('SELECT status FROM tasks WHERE id = ?', [taskId]);
     if (!row) throw new Error(`Task not found: ${taskId}`);
-    if (row.status !== 'review') throw new Error(`Task is not in review: ${row.status}`);
-    return this.moveTask(taskId, 'done', 'user', 'approve');
+    if (row.status !== 'todo') throw new Error(`Task is not in todo status: ${row.status}`);
+    return this.moveTask(taskId, 'approved', 'user', 'approve');
   }
 
-  async rejectReview(taskId: string, reason?: string): Promise<Task> {
+  async completeTask(taskId: string, agentName: string): Promise<Task> {
     const row = await queryOne('SELECT status FROM tasks WHERE id = ?', [taskId]);
     if (!row) throw new Error(`Task not found: ${taskId}`);
     if (row.status !== 'review') throw new Error(`Task is not in review: ${row.status}`);
-    // v2: reject goes to 'claimed', assignee is kept
-    return this.moveTask(taskId, 'claimed', 'user', 'reject', reason);
+    return this.moveTask(taskId, 'done', agentName, 'complete');
+  }
+
+  async reworkTask(taskId: string, agentName: string, corrections: string): Promise<Task> {
+    const row = await queryOne('SELECT status FROM tasks WHERE id = ?', [taskId]);
+    if (!row) throw new Error(`Task not found: ${taskId}`);
+    if (row.status !== 'review') throw new Error(`Task is not in review: ${row.status}`);
+    return this.moveTask(taskId, 'claimed', agentName, 'rework', corrections);
+  }
+
+  async archiveOldTasks(projectId?: string): Promise<{ archived: number }> {
+    const oneMonthAgo = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+    let sql = "SELECT * FROM tasks WHERE status = 'done' AND done_at IS NOT NULL AND done_at < ?";
+    const args: InValue[] = [oneMonthAgo];
+    if (projectId) { sql += ' AND project_id = ?'; args.push(projectId); }
+
+    const rows = await queryAll(sql, args);
+    let archived = 0;
+
+    for (const row of rows) {
+      const taskId = row.id as string;
+
+      // Copy task to archived_tasks
+      await db.execute({
+        sql: `INSERT INTO archived_tasks (id, project_id, title, description, tags, assignee, prerequisites, sort_order, created_at, updated_at, done_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [row.id, row.project_id, row.title, row.description, row.tags, row.assignee, row.prerequisites, row.sort_order, row.created_at, row.updated_at, row.done_at],
+      });
+
+      // Copy history
+      const histRows = await queryAll('SELECT * FROM task_history WHERE task_id = ?', [taskId]);
+      for (const h of histRows) {
+        await db.execute({
+          sql: 'INSERT INTO archived_task_history (task_id, actor, action, from_status, to_status, comment, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          args: [h.task_id, h.actor, h.action, h.from_status, h.to_status, h.comment, h.created_at],
+        });
+      }
+
+      // Copy changes (summary only, no diff)
+      const changeRows = await queryAll('SELECT * FROM task_changes WHERE task_id = ?', [taskId]);
+      for (const c of changeRows) {
+        await db.execute({
+          sql: 'INSERT INTO archived_task_changes (task_id, actor, type, summary, created_at) VALUES (?, ?, ?, ?, ?)',
+          args: [c.task_id, c.actor, c.type, c.summary, c.created_at],
+        });
+      }
+
+      // Delete from active tables
+      await db.execute({ sql: 'DELETE FROM task_changes WHERE task_id = ?', args: [taskId] });
+      await db.execute({ sql: 'DELETE FROM task_history WHERE task_id = ?', args: [taskId] });
+      await db.execute({ sql: 'DELETE FROM tasks WHERE id = ?', args: [taskId] });
+
+      archived++;
+    }
+
+    if (archived > 0) {
+      broadcast('tasks_archived', { count: archived, projectId: projectId ?? null });
+    }
+    return { archived };
+  }
+
+  async listArchivedTasks(projectId?: string): Promise<ArchivedTask[]> {
+    let sql = 'SELECT * FROM archived_tasks WHERE 1=1';
+    const args: InValue[] = [];
+    if (projectId) { sql += ' AND project_id = ?'; args.push(projectId); }
+    sql += ' ORDER BY archived_at DESC';
+    const rows = await queryAll(sql, args);
+    return rows.map(parseArchivedTask);
+  }
+
+  async getArchivedTask(taskId: string): Promise<{ task: ArchivedTask; history: HistoryEntry[]; changes: { id: number; task_id: string; actor: string; type: string; summary: string; created_at: number }[] }> {
+    const row = await queryOne('SELECT * FROM archived_tasks WHERE id = ?', [taskId]);
+    if (!row) throw new Error(`Archived task not found: ${taskId}`);
+
+    const histRows = await queryAll(
+      'SELECT * FROM archived_task_history WHERE task_id = ? ORDER BY created_at ASC',
+      [taskId],
+    );
+    const changeRows = await queryAll(
+      'SELECT * FROM archived_task_changes WHERE task_id = ? ORDER BY created_at ASC',
+      [taskId],
+    );
+
+    return {
+      task: parseArchivedTask(row),
+      history: histRows.map(parseHistory),
+      changes: changeRows as unknown as { id: number; task_id: string; actor: string; type: string; summary: string; created_at: number }[],
+    };
   }
 }
 

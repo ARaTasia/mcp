@@ -25,7 +25,7 @@ export function registerTaskTools(server: McpServer): void {
     'List tasks with optional filters',
     {
       projectId: z.string().optional().describe('Filter by project ID'),
-      status: z.string().optional().describe('Filter by status: todo|claimed|in_progress|review|done'),
+      status: z.string().optional().describe('Filter by status: todo|approved|claimed|in_progress|review|done'),
       tags: z.array(z.string()).optional().describe('Filter by tags (any match)'),
     },
     async ({ projectId, status, tags }) => {
@@ -54,7 +54,7 @@ export function registerTaskTools(server: McpServer): void {
 
   server.tool(
     'task_create',
-    'Create a new task in todo status',
+    'Create a new task in todo (unapproved) status. User must approve it via web UI before agent can start.',
     {
       projectId: z.string().describe('Project ID'),
       title: z.string().describe('Task title'),
@@ -80,7 +80,7 @@ export function registerTaskTools(server: McpServer): void {
 
   server.tool(
     'task_claim',
-    'Claim a todo task (todo → claimed). Validates prerequisites are done.',
+    '[DEPRECATED: Use task_start directly on approved tasks] Claim a todo task (todo → claimed). Validates prerequisites are done.',
     {
       taskId: z.string().describe('Task ID'),
       agentName: z.string().describe('Your agent name'),
@@ -97,7 +97,7 @@ export function registerTaskTools(server: McpServer): void {
 
   server.tool(
     'task_start',
-    'Start work on a claimed task (claimed → in_progress)',
+    'Start work on a task (approved/claimed → in_progress). When starting from approved, validates prerequisites and sets assignee.',
     {
       taskId: z.string().describe('Task ID'),
       agentName: z.string().describe('Your agent name'),
@@ -150,14 +150,18 @@ export function registerTaskTools(server: McpServer): void {
 
   server.tool(
     'task_log_change',
-    'Record code/document changes for a task with a diff view. Call after each meaningful change.',
+    `Record code/document changes for a task. STRICT RULES:
+- One file per call. If you changed 3 files, call 3 times.
+- diff MUST contain the real file path (e.g. "# src/services/kanban.service.ts"), NOT summaries like "# service file".
+- diff MUST contain actual code lines (e.g. "+ if (!name) throw new Error('name required');"), NOT paraphrases like "+ added validation".
+- summary MUST be specific (e.g. "Add name validation to createProject"), NOT generic like "Update file".`,
     {
       taskId: z.string().describe('Task ID'),
       agentName: z.string().describe('Your agent name'),
       type: z.enum(['feature', 'fix', 'docs', 'refactor']).describe('Type of change'),
-      summary: z.string().describe('One-line summary of the change'),
+      summary: z.string().describe('One-line summary of the change — must describe the specific change, not just "update file"'),
       diff: z.string().describe(
-        'Diff-style text. Use # for filename headers, + for added lines, - for removed lines.\nExample:\n# src/foo.ts\n- old line\n+ new line',
+        'Diff-style text. Use # for real file path, + for added lines, - for removed lines.\nExample:\n# src/foo.ts\n- old line\n+ new line',
       ),
     },
     async ({ taskId, agentName, type, summary, diff }) => {
@@ -184,6 +188,41 @@ export function registerTaskTools(server: McpServer): void {
       try {
         await requireProject();
         return ok(await kanbanService.updateTaskMeta(taskId, { title, description, tags, prerequisites }));
+      } catch (e) {
+        return err((e as Error).message);
+      }
+    },
+  );
+
+  server.tool(
+    'task_complete',
+    'Complete a task after self-review (review → done). Agent calls this when self-review checklist passes.',
+    {
+      taskId: z.string().describe('Task ID'),
+      agentName: z.string().describe('Your agent name'),
+    },
+    async ({ taskId, agentName }) => {
+      try {
+        await requireProject();
+        return ok(await kanbanService.completeTask(taskId, agentName));
+      } catch (e) {
+        return err((e as Error).message);
+      }
+    },
+  );
+
+  server.tool(
+    'task_rework',
+    'Send task back for rework after self-review failure (review → claimed). Include corrections describing what needs to be fixed.',
+    {
+      taskId: z.string().describe('Task ID'),
+      agentName: z.string().describe('Your agent name'),
+      corrections: z.string().describe('Description of what needs to be corrected'),
+    },
+    async ({ taskId, agentName, corrections }) => {
+      try {
+        await requireProject();
+        return ok(await kanbanService.reworkTask(taskId, agentName, corrections));
       } catch (e) {
         return err((e as Error).message);
       }
