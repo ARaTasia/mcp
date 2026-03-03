@@ -7,6 +7,7 @@ import express from 'express';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { initSchema } from './db/schema.js';
 import { createMcpServer } from './mcp/server.js';
+import { dbPath, sqlite } from './db/index.js';
 import webRouter from './web/router.js';
 import { initWebSocket } from './web/websocket.js';
 
@@ -58,15 +59,21 @@ async function tryStartWebServer() {
 }
 
 async function main() {
+  process.stderr.write(`[kanban-mcp] DB: ${dbPath}\n`);
   await initSchema();
   await tryStartWebServer();
 
   // PID tracking for shutdown when all clients disconnect
   registerPid();
-  process.stdin.once('end', () => {
+
+  const shutdown = () => {
+    try { sqlite.pragma('wal_checkpoint(TRUNCATE)'); } catch {}
     unregisterPid();
     process.exit(0);
-  });
+  };
+
+  process.stdin.once('end', shutdown);
+  process.on('SIGTERM', shutdown);
   process.on('exit', () => unregisterPid());
 
   const server = createMcpServer();

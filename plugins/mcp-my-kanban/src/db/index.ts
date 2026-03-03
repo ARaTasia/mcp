@@ -5,11 +5,23 @@ import path from 'path';
 
 const dataDir = process.env.KANBAN_DATA_DIR
   ?? path.join(os.homedir(), '.mcp-my-kanban');
-const dbPath = path.join(dataDir, 'kanban.db');
+export const dbPath = path.join(dataDir, 'kanban.db');
 
 fs.mkdirSync(dataDir, { recursive: true });
 
-const sqlite = new Database(dbPath);
+// 시작 시 스마트 백업: 더 큰 파일만 백업으로 유지
+const bakPath = dbPath + '.bak';
+if (fs.existsSync(dbPath)) {
+  try {
+    const currentSize = fs.statSync(dbPath).size;
+    const bakSize = fs.existsSync(bakPath) ? fs.statSync(bakPath).size : 0;
+    if (currentSize > bakSize) {
+      fs.copyFileSync(dbPath, bakPath);
+    }
+  } catch { /* 백업 실패 시 무시 */ }
+}
+
+export const sqlite = new Database(dbPath);
 sqlite.pragma('journal_mode = WAL');
 
 // Compatible types matching the subset of @libsql/client used by this project
