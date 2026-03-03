@@ -666,6 +666,7 @@ async function selectProject(id) {
 
 document.getElementById('projectTrigger').addEventListener('click', (e) => {
   e.stopPropagation();
+  document.getElementById('tagDropdown').classList.remove('open');
   document.getElementById('projectDropdown').classList.toggle('open');
 });
 
