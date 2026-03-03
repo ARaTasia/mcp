@@ -778,22 +778,72 @@ select:focus { border-color: var(--accent); }
 }
 .card-approve-btn:hover { background: rgba(167,139,250,0.25); }
 
-/* ── Approve button in modal ───────────────────────────────────────────── */
+/* ── Stamp approve UI in modal ─────────────────────────────────────────── */
 
-.modal-approve-btn {
-  padding: 6px 16px;
-  border-radius: var(--radius);
-  border: 1px solid rgba(167,139,250,0.3);
-  background: rgba(167,139,250,0.12);
-  color: var(--col-approved);
-  font-size: 13px;
-  font-weight: 500;
-  font-family: var(--font);
-  cursor: pointer;
-  transition: all 0.12s;
-  align-self: center;
+.stamp-section {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
 }
-.modal-approve-btn:hover { background: rgba(167,139,250,0.25); }
+
+.stamp-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  transition: transform 0.15s;
+}
+.stamp-btn:hover { transform: scale(1.05); }
+.stamp-btn:active { transform: scale(0.95); }
+
+.stamp-face {
+  border: 3px solid var(--col-approved);
+  border-radius: 8px;
+  padding: 12px 28px;
+  text-align: center;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+.stamp-btn:hover .stamp-face { opacity: 0.8; }
+
+.stamp-text {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--col-approved);
+  letter-spacing: 0.15em;
+}
+
+.stamp-date {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--col-approved);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.stamp-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: opacity 0.2s;
+}
+
+.stamp-btn.stamped { pointer-events: none; }
+.stamp-btn.stamped .stamp-face {
+  opacity: 1;
+  animation: stampDown 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.stamp-btn.stamped .stamp-hint { opacity: 0; }
+
+@keyframes stampDown {
+  0%   { transform: scale(1.6) rotate(-8deg); opacity: 0; }
+  50%  { transform: scale(0.95) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
 
 /* ── Archive section ────────────────────────────────────────────────────── */
 

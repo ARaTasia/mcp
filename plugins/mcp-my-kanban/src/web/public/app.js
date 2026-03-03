@@ -15,6 +15,7 @@ const I18N = {
              deleteProject: '프로젝트 삭제', deleteConfirm: '삭제', deleteMsg: '프로젝트를 삭제하시겠습니까?',
              deleteWarning: '이 프로젝트에 작업이 있습니다.', deleteWarningDetail: '삭제하면 모든 작업과 히스토리가 함께 삭제됩니다.',
              titleRequired: '제목을 입력하세요.', projectRequired: '프로젝트를 선택해 주세요.',
+             clickToApprove: '클릭하여 승인',
              createFailed: '생성 실패', approveFailed: '승인 실패', deleteFailed: '삭제 실패' },
     time: { sec: '초 전', min: '분 전', hour: '시간 전', day: '일 전' },
     empty: '없음',
@@ -30,6 +31,7 @@ const I18N = {
              deleteProject: 'Delete Project', deleteConfirm: 'Delete', deleteMsg: 'Delete this project?',
              deleteWarning: 'This project has tasks.', deleteWarningDetail: 'All tasks and history will be deleted.',
              titleRequired: 'Title is required.', projectRequired: 'Please select a project.',
+             clickToApprove: 'Click to approve',
              createFailed: 'Create failed', approveFailed: 'Approve failed', deleteFailed: 'Delete failed' },
     time: { sec: 's ago', min: 'm ago', hour: 'h ago', day: 'd ago' },
     empty: 'None',
@@ -519,9 +521,6 @@ function renderTaskModal(task, history, changes = [], isArchived = false) {
         <div class="modal-label">${t('modal.status')}</div>
         <span class="status-badge status-${task.status || 'done'}">${statusLabel}</span>
       </div>
-      ${task.status === 'todo' && !isArchived ? `<div style="display:flex;align-items:end">
-        <button class="modal-approve-btn" id="modalApproveBtn">${t('modal.approve')}</button>
-      </div>` : ''}
       ${task.assignee ? `<div>
         <div class="modal-label">${t('modal.assignee')}</div>
         <span style="font-size:13px">👤 ${escHtml(task.assignee)}</span>
@@ -557,16 +556,29 @@ function renderTaskModal(task, history, changes = [], isArchived = false) {
       <div class="modal-label">${t('modal.history')}</div>
       ${historyHtml}
     </div>
+
+    ${task.status === 'todo' && !isArchived ? `
+    <div class="modal-section stamp-section">
+      <button class="stamp-btn" id="modalApproveBtn">
+        <div class="stamp-face">
+          <div class="stamp-text">APPROVED</div>
+          <div class="stamp-date">${new Date().toISOString().slice(0, 10)}</div>
+        </div>
+        <div class="stamp-hint">${t('modal.clickToApprove')}</div>
+      </button>
+    </div>` : ''}
   `;
 
   const modalApproveBtn = document.getElementById('modalApproveBtn');
   if (modalApproveBtn) {
     modalApproveBtn.addEventListener('click', async () => {
+      modalApproveBtn.classList.add('stamped');
       try {
         await api('PATCH', `/api/tasks/${task.id}/approve`);
         await loadTasks();
-        closeModal('taskModal');
+        setTimeout(() => closeModal('taskModal'), 600);
       } catch (err) {
+        modalApproveBtn.classList.remove('stamped');
         alert(t('modal.approveFailed') + ': ' + err.message);
       }
     });
