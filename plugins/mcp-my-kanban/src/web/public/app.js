@@ -367,11 +367,6 @@ function renderCard(task, index = 0) {
     ? `<span class="card-assignee">${task.assignee}</span>`
     : '';
 
-  // Approve button for todo (unapproved) tasks
-  const approveHtml = (task.status === 'todo' && !locked)
-    ? `<button class="card-approve-btn" data-approve-id="${task.id}">${t('modal.approve')}</button>`
-    : '';
-
   card.innerHTML = `
     <div class="card-header">
       ${lockIcon}
@@ -381,27 +376,11 @@ function renderCard(task, index = 0) {
     <div class="card-meta">
       ${assigneeHtml}
     </div>
-    ${approveHtml}
   `;
 
-  card.addEventListener('click', (e) => {
-    if (e.target.classList.contains('card-approve-btn')) return;
+  card.addEventListener('click', () => {
     openTaskDetail(task.id);
   });
-
-  // Wire approve button
-  const approveBtn = card.querySelector('.card-approve-btn');
-  if (approveBtn) {
-    approveBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      try {
-        await api('PATCH', `/api/tasks/${task.id}/approve`);
-        await loadTasks();
-      } catch (err) {
-        alert(t('modal.approveFailed') + ': ' + err.message);
-      }
-    });
-  }
 
   return card;
 }
