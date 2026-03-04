@@ -253,9 +253,10 @@ If ANY check fails → call task_rework with corrections describing what needs t
             {
               type: 'text' as const,
               text: `🎉 Task completed. Next steps:
-- Call task_list(status=approved) to check for more approved tasks.
-- If there are approved tasks available, pick one and call task_start.
-- If none, inform the user that all approved tasks are done.`,
+1. Commit and push: Stage all changed files, create a git commit with a descriptive message, and push to the remote branch.
+2. Call task_list(status=approved) to check for more approved tasks.
+3. If there are approved tasks available, pick one and call task_start.
+4. If none, inform the user that all approved tasks are done.`,
             },
           ],
         };
