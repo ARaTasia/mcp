@@ -5,7 +5,7 @@ import { registerTaskTools } from './tools/task.tools.js';
 import { registerProjectTools } from './tools/project.tools.js';
 
 export function createMcpServer(): McpServer {
-  const server = new McpServer({ name: 'kanban-mcp', version: '1.5.9' });
+  const server = new McpServer({ name: 'kanban-mcp', version: '1.5.10' });
   registerTaskTools(server);
   registerProjectTools(server);
   return server;
@@ -18,7 +18,7 @@ export function createMcpApp(): express.Express {
   app.post('/mcp', async (req, res) => {
     const server = new McpServer({
       name: 'kanban-mcp',
-      version: '1.5.9',
+      version: '1.5.10',
     });
 
     registerTaskTools(server);

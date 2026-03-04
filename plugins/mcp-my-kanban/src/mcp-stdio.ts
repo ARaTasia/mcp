@@ -40,9 +40,9 @@ async function tryStartWebServer() {
     app.use(express.json());
     app.use(webRouter);
     const server = http.createServer(app);
-    initWebSocket(server);
     server.listen(WEB_PORT);
     server.on('listening', () => {
+      initWebSocket(server);
       process.stderr.write(`Web UI: http://localhost:${WEB_PORT}\n`);
       resolve();
     });
