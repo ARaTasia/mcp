@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import http from 'http';
+import os from 'os';
 import path from 'path';
 import { writeFileSync, unlinkSync, readdirSync, mkdirSync, existsSync } from 'fs';
-import { fileURLToPath } from 'url';
 import express from 'express';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { initSchema } from './db/schema.js';
@@ -13,9 +13,9 @@ import { initWebSocket } from './web/websocket.js';
 
 const WEB_PORT = parseInt(process.env.WEB_PORT ?? '34567', 10);
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.resolve(__dirname, '../data');
-const PIDS_DIR = path.join(DATA_DIR, 'pids');
+const KANBAN_HOME = process.env.KANBAN_DATA_DIR
+  ?? path.join(os.homedir(), '.mcp-my-kanban');
+const PIDS_DIR = path.join(KANBAN_HOME, 'pids');
 
 function registerPid() {
   mkdirSync(PIDS_DIR, { recursive: true });
@@ -67,7 +67,7 @@ async function main() {
   registerPid();
 
   const shutdown = () => {
-    try { sqlite.pragma('wal_checkpoint(TRUNCATE)'); } catch {}
+    try { sqlite.pragma('wal_checkpoint(PASSIVE)'); } catch {}
     unregisterPid();
     process.exit(0);
   };

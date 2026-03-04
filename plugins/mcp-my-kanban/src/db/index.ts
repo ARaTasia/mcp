@@ -16,13 +16,16 @@ if (fs.existsSync(dbPath)) {
     const currentSize = fs.statSync(dbPath).size;
     const bakSize = fs.existsSync(bakPath) ? fs.statSync(bakPath).size : 0;
     if (currentSize > bakSize) {
-      fs.copyFileSync(dbPath, bakPath);
+      const tmpPath = `${bakPath}.${process.pid}.tmp`;
+      fs.copyFileSync(dbPath, tmpPath);
+      fs.renameSync(tmpPath, bakPath);
     }
   } catch { /* 백업 실패 시 무시 */ }
 }
 
 export const sqlite = new Database(dbPath);
 sqlite.pragma('journal_mode = WAL');
+sqlite.pragma('busy_timeout = 5000');
 
 // Compatible types matching the subset of @libsql/client used by this project
 export type InValue = string | number | bigint | ArrayBuffer | null;
