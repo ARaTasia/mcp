@@ -54,7 +54,7 @@ export function registerTaskTools(server: McpServer): void {
 
   server.tool(
     'task_create',
-    'Create a new task in todo (unapproved) status. User must approve it via web UI before agent can start.',
+    'Create a new task in todo (unapproved) status. ⛔ After creation, STOP and wait for user approval in web UI. Do NOT write code or start implementation until task is approved.',
     {
       projectId: z.string().describe('Project ID'),
       title: z.string().describe('Task title'),
@@ -69,9 +69,13 @@ export function registerTaskTools(server: McpServer): void {
     async ({ projectId, title, description, tags, assignee, prerequisites }) => {
       try {
         await requireProject();
-        return ok(
-          await kanbanService.createTask({ projectId, title, description, tags, assignee, prerequisites }),
-        );
+        const task = await kanbanService.createTask({ projectId, title, description, tags, assignee, prerequisites });
+        return {
+          content: [
+            { type: 'text' as const, text: JSON.stringify(task, null, 2) },
+            { type: 'text' as const, text: '⛔ Task created in UNAPPROVED status. DO NOT start implementation.\nYou MUST wait for the user to approve this task via the web UI.\nAfter approval, use task_list(status=approved) to confirm, then task_start to begin work.' },
+          ],
+        };
       } catch (e) {
         return err((e as Error).message);
       }
