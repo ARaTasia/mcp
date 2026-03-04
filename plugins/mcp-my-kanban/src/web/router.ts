@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { kanbanService } from '../services/kanban.service.js';
+import { broadcast } from './websocket.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = express.Router();
@@ -92,6 +93,13 @@ router.get('/api/archived-tasks/:id', async (req, res) => {
   } catch (e) {
     res.status(404).json({ error: (e as Error).message });
   }
+});
+
+// Internal broadcast relay (used by non-WebSocket-owner instances)
+router.post('/api/_broadcast', (req, res) => {
+  const { type, payload } = req.body;
+  if (typeof type === 'string') broadcast(type, payload);
+  res.status(204).end();
 });
 
 // Serve SPA for root

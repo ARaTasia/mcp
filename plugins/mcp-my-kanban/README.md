@@ -1,4 +1,5 @@
 # mcp-my-kanban
+<!-- Last tested: 2026-03-03 -->
 
 [한국어](README.ko.md)
 

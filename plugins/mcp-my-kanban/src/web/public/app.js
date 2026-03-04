@@ -748,6 +748,8 @@ function connectWS() {
   ws.onopen = () => {
     updateWsStatus(true);
     clearTimeout(wsReconnectTimer);
+    loadProjects().catch(() => {});
+    loadTasks().catch(() => {});
   };
 
   ws.onclose = () => {
