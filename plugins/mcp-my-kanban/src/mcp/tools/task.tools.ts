@@ -73,7 +73,17 @@ export function registerTaskTools(server: McpServer): void {
         return {
           content: [
             { type: 'text' as const, text: JSON.stringify(task, null, 2) },
-            { type: 'text' as const, text: '⛔ Task created in UNAPPROVED status. DO NOT start implementation.\nYou MUST wait for the user to approve this task via the web UI.\nAfter approval, use task_list(status=approved) to confirm, then task_start to begin work.' },
+            {
+              type: 'text' as const,
+              text: `⛔ MANDATORY CHECKLIST before proceeding:
+
+1. SELF-CHECK: Review the task you just created. Does the title and description contain ALL information needed for implementation? (requirements, scope, affected files, acceptance criteria) If not, call task_update now to add missing details.
+
+2. STOP: This task is UNAPPROVED. Do NOT write code, modify files, or start implementation.
+   - Tell the user: "태스크를 등록했습니다. 웹 UI에서 승인해주세요."
+   - Wait for the user to approve the task in the web UI.
+   - After approval, use task_list(status=approved) to confirm, then task_start to begin.`,
+            },
           ],
         };
       } catch (e) {
@@ -109,7 +119,19 @@ export function registerTaskTools(server: McpServer): void {
     async ({ taskId, agentName }) => {
       try {
         await requireProject();
-        return ok(await kanbanService.startTask(taskId, agentName));
+        const result = await kanbanService.startTask(taskId, agentName);
+        return {
+          content: [
+            { type: 'text' as const, text: JSON.stringify(result, null, 2) },
+            {
+              type: 'text' as const,
+              text: `✅ Task started. Next steps:
+1. Post a start comment with task_comment: outline your work plan (analysis → implementation → verification).
+2. Begin implementation. After EVERY file change, immediately call task_log_change with the real file path and actual diff.
+3. When done, call task_submit_review.`,
+            },
+          ],
+        };
       } catch (e) {
         return err((e as Error).message);
       }
@@ -127,7 +149,23 @@ export function registerTaskTools(server: McpServer): void {
     async ({ taskId, agentName, summary }) => {
       try {
         await requireProject();
-        return ok(await kanbanService.submitReview(taskId, agentName, summary));
+        const result = await kanbanService.submitReview(taskId, agentName, summary);
+        return {
+          content: [
+            { type: 'text' as const, text: JSON.stringify(result, null, 2) },
+            {
+              type: 'text' as const,
+              text: `📋 Task submitted for review. Run self-review checklist NOW:
+- [ ] All requirements from the task description are met?
+- [ ] No existing functionality is broken?
+- [ ] Every file change has been recorded with task_log_change?
+- [ ] Each diff contains real file paths and actual code lines?
+
+If ALL checks pass → call task_complete.
+If ANY check fails → call task_rework with corrections describing what needs to be fixed.`,
+            },
+          ],
+        };
       } catch (e) {
         return err((e as Error).message);
       }
@@ -208,7 +246,19 @@ export function registerTaskTools(server: McpServer): void {
     async ({ taskId, agentName }) => {
       try {
         await requireProject();
-        return ok(await kanbanService.completeTask(taskId, agentName));
+        const result = await kanbanService.completeTask(taskId, agentName);
+        return {
+          content: [
+            { type: 'text' as const, text: JSON.stringify(result, null, 2) },
+            {
+              type: 'text' as const,
+              text: `🎉 Task completed. Next steps:
+- Call task_list(status=approved) to check for more approved tasks.
+- If there are approved tasks available, pick one and call task_start.
+- If none, inform the user that all approved tasks are done.`,
+            },
+          ],
+        };
       } catch (e) {
         return err((e as Error).message);
       }
@@ -226,7 +276,20 @@ export function registerTaskTools(server: McpServer): void {
     async ({ taskId, agentName, corrections }) => {
       try {
         await requireProject();
-        return ok(await kanbanService.reworkTask(taskId, agentName, corrections));
+        const result = await kanbanService.reworkTask(taskId, agentName, corrections);
+        return {
+          content: [
+            { type: 'text' as const, text: JSON.stringify(result, null, 2) },
+            {
+              type: 'text' as const,
+              text: `🔄 Task sent back for rework. Next steps:
+1. Call task_start to re-enter in_progress status.
+2. Fix the issues described in corrections.
+3. Record all changes with task_log_change.
+4. When fixes are complete, call task_submit_review again.`,
+            },
+          ],
+        };
       } catch (e) {
         return err((e as Error).message);
       }
